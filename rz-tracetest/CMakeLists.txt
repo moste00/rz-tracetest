@@ -4,6 +4,15 @@ set(CMAKE_CXX_STANDARD 17)
 
 find_package(Rizin REQUIRED Core)
 
+option(ENABLE_ASAN "Enable address sanitizer" OFF)
+
+if (ENABLE_ASAN)
+    message("Enabling ASAN")
+    add_definitions(-DASAN_ENABLED)
+    add_compile_options(-fsanitize=address,undefined)
+    add_link_options(-fsanitize=address,undefined)
+endif()
+
 add_subdirectory(libtrace)
 
 set(SOURCE
