@@ -105,3 +105,12 @@ For specifics about the frame contents, please check the definitions in the [piq
 |    T+0x10  | uint64_t     | offset toc_entry(1) | |
 |    ...     | ...          | ... | |
 |    T+0x8+(0x8*ceil(n/m))   | uint64_t     | offset toc_entry(ceil(n/m)) | |
+
+Works with TCG tracing plugin
+-----------------------------
+
+| Architecture | Works with TCG plugin |
+|--------------|-----------------------|
+| Hexagon      | Yes                   |
+| PPC          | No - register and endian mismatches |
+| ARM          | No - Cannot trace cpu modes |

@@ -15,6 +15,73 @@
 // Mask to exclude ISA3 flags (ca32, ov32).
 #define PPC_XER_ISA2_BITS_MASK 0xfffffffffff3ffff
 
+struct reg_name_mapping {
+	const char *qemu;
+	const char *rz;
+};
+
+static struct reg_name_mapping hexagon_reg_mapping[] {
+	{ .qemu = "r00", .rz = "R0" },
+	{ .qemu = "r01", .rz = "R1" },
+	{ .qemu = "r02", .rz = "R2" },
+	{ .qemu = "r03", .rz = "R3" },
+	{ .qemu = "r04", .rz = "R4" },
+	{ .qemu = "r05", .rz = "R5" },
+	{ .qemu = "r06", .rz = "R6" },
+	{ .qemu = "r07", .rz = "R7" },
+	{ .qemu = "r08", .rz = "R8" },
+	{ .qemu = "r09", .rz = "R9" },
+	{ .qemu = "r10", .rz = "R10" },
+	{ .qemu = "r11", .rz = "R11" },
+	{ .qemu = "r12", .rz = "R12" },
+	{ .qemu = "r13", .rz = "R13" },
+	{ .qemu = "r14", .rz = "R14" },
+	{ .qemu = "r15", .rz = "R15" },
+	{ .qemu = "r16", .rz = "R16" },
+	{ .qemu = "r17", .rz = "R17" },
+	{ .qemu = "r18", .rz = "R18" },
+	{ .qemu = "r19", .rz = "R19" },
+	{ .qemu = "r20", .rz = "R20" },
+	{ .qemu = "r21", .rz = "R21" },
+	{ .qemu = "r22", .rz = "R22" },
+	{ .qemu = "r23", .rz = "R23" },
+	{ .qemu = "r24", .rz = "R24" },
+	{ .qemu = "r25", .rz = "R25" },
+	{ .qemu = "r26", .rz = "R26" },
+	{ .qemu = "r27", .rz = "R27" },
+	{ .qemu = "r28", .rz = "R28" },
+	{ .qemu = "r29", .rz = "R29" },
+	{ .qemu = "r30", .rz = "R30" },
+	{ .qemu = "r31", .rz = "R31" },
+
+	{ .qemu = "sa0", .rz = "C0" },
+	{ .qemu = "lc0", .rz = "C1" },
+	{ .qemu = "sa1", .rz = "C2" },
+	{ .qemu = "lc1", .rz = "C3" },
+	{ .qemu = "p3_0", .rz = "C4" },
+	// C5 = reserved
+	{ .qemu = "m0", .rz = "C6" },
+	{ .qemu = "m1", .rz = "C7" },
+	{ .qemu = "usr", .rz = "C8" },
+	// PC = C9
+	{ .qemu = "ugp", .rz = "C10" },
+	{ .qemu = "gp", .rz = "C11" },
+	{ .qemu = "cs0", .rz = "C12" },
+	{ .qemu = "cs1", .rz = "C13" },
+	{ .qemu = "upcyclelo", .rz = "C14" },
+	{ .qemu = "upcyclehi", .rz = "C15" },
+	{ .qemu = "framelimit", .rz = "C16" },
+	{ .qemu = "framekey", .rz = "C17" },
+	{ .qemu = "pktcountlo", .rz = "C18" },
+	{ .qemu = "pktcounthi", .rz = "C19" },
+	// Dumy regs (supposingly)
+	// { .qemu = "pkt_cnt", .rz = "pkt_cnt" },
+	// { .qemu = "insn_cnt", .rz = "C0" },
+	// { .qemu = "hvx_cnt", .rz = "C0" },
+	{ .qemu = "utimerlo", .rz = "C30" },
+	{ .qemu = "utimerhi", .rz = "C31" },
+};
+
 /*
  * Interface for any arch/source/... specific adjustments
  */

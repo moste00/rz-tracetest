@@ -350,11 +350,13 @@ class HexagonTraceAdapter : public TraceAdapter {
 		}
 
 		std::string TraceRegToRizin(const std::string &tracereg) const override {
-			std::string r = tracereg.substr(0, tracereg.find("_tmp"));
-			std::transform(r.begin(), r.end(), r.begin(), ::toupper);
-			if (tracereg.find("_tmp") != std::string::npos) {
-				return r + "_tmp";
+			std::string r = tracereg;
+			for (size_t i = 0; i < RZ_ARRAY_SIZE(hexagon_reg_mapping); ++i) {
+				if (hexagon_reg_mapping[i].qemu == tracereg) {
+					r = hexagon_reg_mapping[i].rz;
+				}
 			}
+			std::transform(r.begin(), r.end(), r.begin(), ::toupper);
 			return r;
 		}
 
