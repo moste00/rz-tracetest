@@ -44,6 +44,7 @@ sudo apt install libprotobuf-dev protobuf-compiler
 Then:
 ```
 cd rz-tracetest
+# -DCMAKE_BUILD_TYPE=Debug for debugging, -DENABLE_ASAN=1 for ASAN
 cmake -Bbuild -GNinja
 ninja -C build
 ```
