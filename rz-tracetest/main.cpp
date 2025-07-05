@@ -110,7 +110,7 @@ int main(int argc, const char *argv[]) {
 	}
 
 	SerializedTrace::TraceContainerReader trace(argv[opt.ind]);
-	auto adapter = SelectTraceAdapter(trace.get_arch());
+	auto adapter = SelectTraceAdapter(trace.get_arch(), trace.get_machine());
 	if (!adapter) {
 		throw RizinException("Failed to match frame_architecture %d to TraceAdapter.\n", (int)trace.get_arch());
 	}

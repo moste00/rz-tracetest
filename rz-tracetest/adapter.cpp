@@ -178,6 +178,45 @@ class Arm64TraceAdapter : public TraceAdapter {
 		}
 };
 
+
+class Sparc32TraceAdapter : public TraceAdapter {
+	public:
+		std::string RizinArch() const override { return "sparc"; }
+		std::string RizinCPU() const override { return "v8"; }
+
+		int RizinBits(std::optional<std::string> mode, std::optional<uint64_t> machine) const override { return 32; }
+
+		std::string TraceRegToRizin(const std::string &tracereg) const override {
+			if (tracereg == "sp") {
+				return "o6";
+			} else if (tracereg == "fp") {
+				return "i6";
+			} else if (tracereg == "state") {
+				return "asr";
+			}
+			return tracereg;
+		}
+};
+
+class Sparc64TraceAdapter : public TraceAdapter {
+	public:
+		std::string RizinArch() const override { return "sparc"; }
+		std::string RizinCPU() const override { return "v9"; }
+
+		int RizinBits(std::optional<std::string> mode, std::optional<uint64_t> machine) const override { return 64; }
+
+		std::string TraceRegToRizin(const std::string &tracereg) const override {
+			if (tracereg == "sp") {
+				return "o6";
+			} else if (tracereg == "fp") {
+				return "i6";
+			} else if (tracereg == "state") {
+				return "asr";
+			}
+			return tracereg;
+		}
+};
+
 class PPCTraceAdapter : public TraceAdapter {
 	public:
 		std::string RizinArch() const override { return "ppc"; }
@@ -421,7 +460,7 @@ class X86TraceAdapter : public TraceAdapter {
 	}
 };
 
-std::unique_ptr<TraceAdapter> SelectTraceAdapter(frame_architecture arch) {
+std::unique_ptr<TraceAdapter> SelectTraceAdapter(frame_architecture arch, size_t mach) {
 	switch (arch) {
 	case frame_arch_6502:
 		return std::unique_ptr<TraceAdapter>(new VICETraceAdapter());
@@ -441,6 +480,11 @@ std::unique_ptr<TraceAdapter> SelectTraceAdapter(frame_architecture arch) {
 		return std::unique_ptr<TraceAdapter>(new HexagonTraceAdapter());
 	case frame_arch_i386:
 		return std::unique_ptr<TraceAdapter>(new X86TraceAdapter());
+	case frame_arch_sparc:
+		if (mach >= frame_mach_sparc_v9) {
+			return std::unique_ptr<TraceAdapter>(new Sparc64TraceAdapter());
+		}
+		return std::unique_ptr<TraceAdapter>(new Sparc32TraceAdapter());
 	default:
 		return nullptr;
 	}

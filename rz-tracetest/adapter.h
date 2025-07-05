@@ -206,6 +206,6 @@ class TraceAdapter {
 		uint64_t machine = 0;
 };
 
-std::unique_ptr<TraceAdapter> SelectTraceAdapter(frame_architecture arch);
+std::unique_ptr<TraceAdapter> SelectTraceAdapter(frame_architecture arch, size_t mach);
 
 #endif
