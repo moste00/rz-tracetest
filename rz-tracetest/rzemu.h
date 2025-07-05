@@ -47,7 +47,7 @@ enum class FrameCheckResult {
 	PostStateMismatch,
 	Unimplemented
 };
-#define FRAME_CHECK_RESULT_COUNT 6
+#define FRAME_CHECK_RESULT_COUNT 7
 
 class RizinEmulator {
 	private:
