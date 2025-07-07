@@ -81,6 +81,9 @@ A fixed number of frame entries are considered one _entry_ in the TOC.
 
 The TOC index is stored at the end.
 
+[!IMPORTANT]
+The last TOC entry might holds less than `m` frames.
+
 For specifics about the frame contents, please check the definitions in the [piqi](piqi/) directory.
 
 **Format**
