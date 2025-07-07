@@ -74,7 +74,7 @@ static struct reg_name_mapping hexagon_reg_mapping[] {
 	{ .qemu = "framekey", .rz = "C17" },
 	{ .qemu = "pktcountlo", .rz = "C18" },
 	{ .qemu = "pktcounthi", .rz = "C19" },
-	// Dumy regs (supposingly)
+	// Dummy regs (supposingly)
 	// { .qemu = "pkt_cnt", .rz = "pkt_cnt" },
 	// { .qemu = "insn_cnt", .rz = "C0" },
 	// { .qemu = "hvx_cnt", .rz = "C0" },
