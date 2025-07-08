@@ -45,9 +45,10 @@ enum class FrameCheckResult {
 	InvalidIL,
 	VMRuntimeError,
 	PostStateMismatch,
-	Unimplemented
+	Unimplemented,
+	Unkown
 };
-#define FRAME_CHECK_RESULT_COUNT 7
+#define FRAME_CHECK_RESULT_COUNT 8
 
 class RizinEmulator {
 	private:

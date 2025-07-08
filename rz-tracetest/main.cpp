@@ -182,6 +182,9 @@ int main(int argc, const char *argv[]) {
 			printf("              skipped: ");
 			break;
 		case FrameCheckResult::InvalidOp:
+			printf("           invalid op: ");
+			break;
+		case FrameCheckResult::Unimplemented:
 			printf("             unlifted: ");
 			break;
 		case FrameCheckResult::InvalidIL:
@@ -193,8 +196,8 @@ int main(int argc, const char *argv[]) {
 		case FrameCheckResult::PostStateMismatch:
 			printf("          misexecuted: ");
 			break;
-		case FrameCheckResult::Unimplemented:
-			printf("missing trace feature: ");
+		case FrameCheckResult::Unkown:
+			printf("     unknown failures: ");
 			break;
 		}
 		float percent = 100.0f * (float)stats[i] / (float)total;

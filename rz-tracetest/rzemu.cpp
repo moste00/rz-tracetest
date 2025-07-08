@@ -295,7 +295,7 @@ FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut6
 			print_disasm();
 			printf("analysis plugin did not lift to IL\n");
 		}
-		return FrameCheckResult::InvalidOp;
+		return FrameCheckResult::Unimplemented;
 	}
 	RzILValidateReport validate_report = nullptr;
 	if (!rz_il_validate_effect(aop->il_op, validate_ctx.get(), NULL, NULL, &validate_report)) {
@@ -322,14 +322,17 @@ FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut6
 			printf("runtime error\n");
 			return FrameCheckResult::VMRuntimeError;
 		case RZ_ANALYSIS_IL_STEP_INVALID_OP:
-			printf("unlifted or invalid op\n");
+			printf("invalid op\n");
 			return FrameCheckResult::InvalidOp;
+		case RZ_ANALYSIS_IL_STEP_UNIMPLEMENTED_IL:
+			printf("unlifted op\n");
+			return FrameCheckResult::Unimplemented;
 		case RZ_ANALYSIS_IL_STEP_RESULT_NOT_SET_UP:
 			printf("not set up\n");
-			return FrameCheckResult::Unimplemented;
+			return FrameCheckResult::VMRuntimeError;
 		default:
 			printf("unknown\n");
-			return FrameCheckResult::Unimplemented;
+			return FrameCheckResult::InvalidIL;
 		}
 	}
 
