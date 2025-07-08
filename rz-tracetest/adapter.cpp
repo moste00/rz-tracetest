@@ -477,7 +477,7 @@ std::unique_ptr<TraceAdapter> SelectTraceAdapter(frame_architecture arch, size_t
 	case frame_arch_i386:
 		return std::unique_ptr<TraceAdapter>(new X86TraceAdapter());
 	case frame_arch_sparc:
-		if (mach >= frame_mach_sparc_v9) {
+		if (frame_mach_sparc_v9_p(mach) != 0) {
 			return std::unique_ptr<TraceAdapter>(new Sparc64TraceAdapter());
 		}
 		return std::unique_ptr<TraceAdapter>(new Sparc32TraceAdapter());
