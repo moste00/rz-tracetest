@@ -159,13 +159,14 @@ class TraceAdapter {
 		virtual bool IgnoreCompareMemMismatch() const { return false; }
 
 		/**
-		 * \brief Returns if a given register name from the trace should be ignored if it isn't implemented in Rizin.
+		 * \brief Returns if a given register name from the trace should be ignored
+		 * if it isn't implemented in Rizin.
 		 *
-		 * \param rz_reg_name The trace register name.
+		 * \param trace_reg_name The trace register name.
 		 * \return true The register, missing in Rizin, should be ignored.
 		 * \return false Notify the user about the missing register in Rizin.
 		 */
-		virtual bool IgnoreUnknownReg(const std::string &rz_reg_name) const;
+		virtual bool IgnoreUnknownReg(const std::string &trace_reg_name) const;
 
 		/**
 		 * \brief Checks if the given even can be ignored during checks.

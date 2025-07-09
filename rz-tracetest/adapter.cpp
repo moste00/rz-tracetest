@@ -21,7 +21,7 @@ int TraceAdapter::RizinBits(std::optional<std::string> mode, std::optional<uint6
 	return 0;
 }
 
-bool TraceAdapter::IgnoreUnknownReg(const std::string &rz_reg_name) const {
+bool TraceAdapter::IgnoreUnknownReg(const std::string &trace_reg_name) const {
 	return false;
 }
 
@@ -233,8 +233,8 @@ class PPCTraceAdapter : public TraceAdapter {
 			return false;
 		}
 
-		bool IgnoreUnknownReg(const std::string &rz_reg_name) const override {
-			return rz_reg_name == "ca32" || rz_reg_name == "ov32";
+		bool IgnoreUnknownReg(const std::string &trace_reg_name) const override {
+			return trace_reg_name == "ca32" || trace_reg_name == "ov32";
 		}
 
 		std::string TraceRegToRizin(const std::string &tracereg) const override {
@@ -301,7 +301,7 @@ class I8051TraceAdapter : public TraceAdapter {
 			return false;
 		}
 
-		bool IgnoreUnknownReg(const std::string &rz_reg_name) const override {
+		bool IgnoreUnknownReg(const std::string &trace_reg_name) const override {
 			return true;
 		}
 };
@@ -320,7 +320,7 @@ class MipsTraceAdapter : public TraceAdapter {
 			return false;
 		}
 
-		bool IgnoreUnknownReg(const std::string &rz_reg_name) const override {
+		bool IgnoreUnknownReg(const std::string &trace_reg_name) const override {
 			return true;
 		}
 };
@@ -385,7 +385,7 @@ class HexagonTraceAdapter : public TraceAdapter {
 			return false;
 		}
 
-		bool IgnoreUnknownReg(const std::string &rz_reg_name) const override {
+		bool IgnoreUnknownReg(const std::string &trace_reg_name) const override {
 			return false;
 		}
 
