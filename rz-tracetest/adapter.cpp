@@ -189,8 +189,6 @@ class Sparc32TraceAdapter : public TraceAdapter {
 		std::string TraceRegToRizin(const std::string &tracereg) const override {
 			if (tracereg == "fp") {
 				return "i6";
-			} else if (tracereg == "state") {
-				return "asr";
 			}
 			return tracereg;
 		}
@@ -206,10 +204,17 @@ class Sparc64TraceAdapter : public TraceAdapter {
 		std::string TraceRegToRizin(const std::string &tracereg) const override {
 			if (tracereg == "fp") {
 				return "i6";
-			} else if (tracereg == "state") {
-				return "asr";
 			}
 			return tracereg;
+		}
+
+		bool IgnoreUnknownReg(const std::string &trace_reg_name) const override {
+			if (trace_reg_name == "state") {
+				// 'state' is the the TSTATE register from the ISA.
+				// Because we don't support traps we can ignore it.
+				return true;
+			}
+			return false;
 		}
 };
 
