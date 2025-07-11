@@ -187,9 +187,6 @@ class Sparc32TraceAdapter : public TraceAdapter {
 		int RizinBits(std::optional<std::string> mode, std::optional<uint64_t> machine) const override { return 32; }
 
 		std::string TraceRegToRizin(const std::string &tracereg) const override {
-			if (tracereg == "fp") {
-				return "i6";
-			}
 			return tracereg;
 		}
 };
@@ -202,9 +199,6 @@ class Sparc64TraceAdapter : public TraceAdapter {
 		int RizinBits(std::optional<std::string> mode, std::optional<uint64_t> machine) const override { return 64; }
 
 		std::string TraceRegToRizin(const std::string &tracereg) const override {
-			if (tracereg == "fp") {
-				return "i6";
-			}
 			return tracereg;
 		}
 
