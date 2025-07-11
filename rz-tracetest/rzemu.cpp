@@ -143,7 +143,7 @@ std::map<std::string, int> RizinEmulator::get_post_op_map(const std_frame &sf) {
 }
 
 FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut64> next_pc, int verbose, bool invalid_op_quiet,
-	std::optional<std::function<bool(const std::string &)>> skip_by_disasm, bool cache_reset) {
+	std::optional<std::function<bool(const std::string &)>> skip_by_disasm, size_t *tested_insn_id, bool cache_reset) {
 	if (!f->has_std_frame()) {
 		printf("Non-std frame, can't deal with this (yet)\n");
 		return FrameCheckResult::Unimplemented;
@@ -297,6 +297,8 @@ FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut6
 		}
 		return FrameCheckResult::Unimplemented;
 	}
+	*tested_insn_id = aop->id;
+
 	RzILValidateReport validate_report = nullptr;
 	if (!rz_il_validate_effect(aop->il_op, validate_ctx.get(), NULL, NULL, &validate_report)) {
 		print_disasm();

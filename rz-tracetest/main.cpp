@@ -5,6 +5,7 @@
 #include "dump.h"
 
 #include <regex>
+#include <rz_util/rz_set.h>
 
 static int help(bool verbose) {
 	printf("Usage: rz-tracetest [-dbeurmphivn] [-c count] [-o offset] [-s regex] <filename>.frames\n");
@@ -127,6 +128,8 @@ int main(int argc, const char *argv[]) {
 	r.SetPrettyIL(prettify_il);
 	trace.seek(offset);
 	ut64 stats[FRAME_CHECK_RESULT_COUNT] = {};
+	RzSetU *covered_insn_ids = rz_set_u_new();
+	size_t tested_insn_id = 0;
 	std::unique_ptr<frame> cur_frame = trace.get_frame();
 
 	printf("\nCompare frames...\n");
@@ -138,7 +141,10 @@ int main(int argc, const char *argv[]) {
 		if (next_frame && next_frame->has_std_frame()) {
 			next_pc = next_frame->std_frame().address();
 		}
-		auto res = r.RunFrame(offset++, cur_frame.get(), next_pc, verbose, invalid_op_quiet, skip_by_disasm, cache_reset);
+		auto res = r.RunFrame(offset++, cur_frame.get(), next_pc, verbose, invalid_op_quiet, skip_by_disasm, &tested_insn_id, cache_reset);
+		if (tested_insn_id) {
+			rz_set_u_add(covered_insn_ids, tested_insn_id);
+		}
 		stats[static_cast<int>(res)]++;
 		count--;
 		total++;
@@ -206,6 +212,13 @@ int main(int argc, const char *argv[]) {
 			percent = 99.99f;
 		}
 		printf("%-7" PFMT64u " %5.2f%%\n", stats[i], percent);
+	}
+
+	size_t covered = rz_set_u_size(covered_insn_ids);
+	printf("\nUnique instructions emulated: %" PFMTSZu "\n", covered);
+	if (covered < 10) {
+		printf("\nCovered instructions seem unreasonably low.\n");
+		printf("Either RzAnalysisOp->id is not set by the arch plugin or binary is very small.\n");
 	}
 
 	return 0;
