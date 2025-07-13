@@ -169,6 +169,16 @@ class TraceAdapter {
 		virtual bool IgnoreUnknownReg(const std::string &trace_reg_name) const;
 
 		/**
+		 * \brief Returns if a post state mismatch
+		 * of the given register can be ignored.
+		 *
+		 * \param rz_reg_name The Rizin register name.
+		 * \return true The register mismatch can be ignored.
+		 * \return false Mismatch should be logged.
+		 */
+		virtual bool IgnorePostMismatchReg(const std::string &rz_reg_name) const { return false; }
+
+		/**
 		 * \brief Checks if the given even can be ignored during checks.
 		 *
 		 * \param event The trace event to check.

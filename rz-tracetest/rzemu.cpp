@@ -421,7 +421,7 @@ FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut6
 				pc_tracename = ro.name();
 				pc_expect = rz_bv_to_ut64(tbv);
 			}
-			if (!rz_bv_eq(tbv, rbv) && (post_op_map[rn] <= 1)) {
+			if (!rz_bv_eq(tbv, rbv) && (post_op_map[rn] <= 1) && !adapter->IgnorePostMismatchReg(ri->name)) {
 				mismatched();
 				char *ts = rz_bv_as_hex_string(tbv, true);
 				char *rs = rz_bv_as_hex_string(rbv, true);

@@ -189,6 +189,17 @@ class Sparc32TraceAdapter : public TraceAdapter {
 		std::string TraceRegToRizin(const std::string &tracereg) const override {
 			return tracereg;
 		}
+
+		// We ignore all writes and reads to PC or NPC.
+		// Due to the inability of the QEMU trace to properly
+		// log delayed branches, we need to test them separatly.
+		bool IgnorePCMismatch(ut64 pc_actual, ut64 pc_expect) const override {
+			return true;
+		}
+
+		virtual bool IgnorePostMismatchReg(const std::string &rz_reg_name) const override {
+			return rz_reg_name == "pc" || rz_reg_name == "npc";
+		}
 };
 
 class Sparc64TraceAdapter : public TraceAdapter {
@@ -209,6 +220,14 @@ class Sparc64TraceAdapter : public TraceAdapter {
 				return true;
 			}
 			return false;
+		}
+
+		bool IgnorePCMismatch(ut64 pc_actual, ut64 pc_expect) const override {
+			return true;
+		}
+
+		virtual bool IgnorePostMismatchReg(const std::string &rz_reg_name) const override {
+			return rz_reg_name == "pc" || rz_reg_name == "npc";
 		}
 };
 
