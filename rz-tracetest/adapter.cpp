@@ -199,6 +199,9 @@ class Sparc32TraceAdapter : public TraceAdapter {
 				return false;
 			case RZ_IL_EVENT_VAR_WRITE:
 				return rz_il_value_eq(event->data.var_write.old_value, event->data.var_write.new_value);
+			case RZ_IL_EVENT_MEM_WRITE:
+				// The memory region 1 is Rizin's region to backup register content for read and write.
+				return event->data.mem_write.index == 1; // = SPARC_ASI_INDEX_RW
 			}
 			return false;
 		};
@@ -235,6 +238,9 @@ class Sparc64TraceAdapter : public TraceAdapter {
 				return false;
 			case RZ_IL_EVENT_VAR_WRITE:
 				return rz_il_value_eq(event->data.var_write.old_value, event->data.var_write.new_value);
+			case RZ_IL_EVENT_MEM_WRITE:
+				// The memory region 1 is Rizin's region to backup register content for read and write.
+				return event->data.mem_write.index == 1; // = SPARC_ASI_INDEX_RW
 			}
 			return false;
 		};
