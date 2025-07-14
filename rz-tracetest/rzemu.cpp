@@ -142,6 +142,12 @@ std::map<std::string, int> RizinEmulator::get_post_op_map(const std_frame &sf) {
 	return duplicate_map;
 }
 
+static void print_reg_mismatch_msg(const char *rz_reg, const char *trace_reg, const char *rz_reg_val, const char *trace_reg_val) {
+	printf(Color_RED "MISMATCH" Color_RESET " post register:\n");
+	printf("  expected %8s = %s\n", trace_reg, trace_reg_val);
+	printf("  got      %8s = %s\n", rz_reg, rz_reg_val);
+}
+
 FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut64> next_pc, int verbose, bool invalid_op_quiet,
 	std::optional<std::function<bool(const std::string &)>> skip_by_disasm, size_t *tested_insn_id, bool cache_reset) {
 	if (!f->has_std_frame()) {
@@ -245,6 +251,12 @@ FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut6
 			const auto &ro = o.operand_info_specific().reg_operand();
 			auto rn = adapter->TraceRegToRizin(ro.name());
 			if (rn.empty()) {
+				continue;
+			}
+			if (adapter->RegNeedsCustomHandling(ro.name())) {
+				RzBitVector *bv = rz_bv_new_from_bytes_le((const ut8 *)o.value().data(), 0, RegOperandSizeBits(o));
+				adapter->CustomRegSetup(reg.get(), ro.name(), bv);
+				rz_bv_free(bv);
 				continue;
 			}
 			RzRegItem *ri = rz_reg_get(reg.get(), rn.c_str(), RZ_REG_TYPE_ANY);
@@ -406,6 +418,21 @@ FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut6
 			if (rn.empty()) {
 				continue;
 			}
+			if (adapter->RegNeedsCustomHandling(ro.name())) {
+				char *mismatching_reg = NULL;
+				char *mismatching_val = NULL;
+				RzBitVector *bv = rz_bv_new_from_bytes_le((const ut8 *)o.value().data(), 0, RegOperandSizeBits(o));
+				if (!adapter->CustomRegCompare(reg.get(), ro.name(), bv, &mismatching_reg, &mismatching_val)) {
+					mismatched();
+					char *ts = rz_hex_bin2strdup((const ut8 *)o.value().data(), bv->len / 8);
+					print_reg_mismatch_msg(mismatching_reg, ro.name().c_str(), mismatching_val, ts);
+					rz_mem_free(ts);
+					rz_mem_free(mismatching_val);
+					rz_mem_free(mismatching_reg);
+				}
+				rz_bv_free(bv);
+				continue;
+			}
 			RzRegItem *ri = rz_reg_get(reg.get(), rn.c_str(), RZ_REG_TYPE_ANY);
 			if (!ri) {
 				if (!adapter->IgnoreUnknownReg(ro.name())) {
@@ -425,9 +452,7 @@ FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut6
 				mismatched();
 				char *ts = rz_bv_as_hex_string(tbv, true);
 				char *rs = rz_bv_as_hex_string(rbv, true);
-				printf(Color_RED "MISMATCH" Color_RESET " post register:\n");
-				printf("  expected %8s = %s\n", ro.name().c_str(), ts);
-				printf("  got      %8s = %s\n", ri->name, rs);
+				print_reg_mismatch_msg(ri->name, ro.name().c_str(), rs, ts);
 				rz_mem_free(ts);
 				rz_mem_free(rs);
 			} else {

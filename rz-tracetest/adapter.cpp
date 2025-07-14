@@ -4,6 +4,8 @@
 #include "adapter.h"
 
 #include <memory>
+#include <rz_util/rz_bitvector.h>
+#include <rz_util/rz_hex.h>
 
 static inline bool IsOneBitFlag(const std::string &tn) {
 	// PPC
@@ -234,8 +236,11 @@ class Sparc64TraceAdapter : public TraceAdapter {
 			switch (event->type) {
 			default:
 				return false;
-			case RZ_IL_EVENT_VAR_READ:
-				return false;
+			case RZ_IL_EVENT_VAR_READ: {
+				// These registers don't exist in the QEMU.
+				const char *var_name = event->data.var_read.variable;
+				return RZ_STR_EQ(var_name, "cwp") || RZ_STR_EQ(var_name, "ccr") || RZ_STR_EQ(var_name, "pstate") || RZ_STR_EQ(var_name, "asi");
+			}
 			case RZ_IL_EVENT_VAR_WRITE:
 				return rz_il_value_eq(event->data.var_write.old_value, event->data.var_write.new_value);
 			case RZ_IL_EVENT_MEM_WRITE:
@@ -246,12 +251,92 @@ class Sparc64TraceAdapter : public TraceAdapter {
 		};
 
 		bool IgnoreUnknownReg(const std::string &trace_reg_name) const override {
-			if (trace_reg_name == "state") {
-				// 'state' is the the TSTATE register from the ISA.
-				// Because we don't support traps we can ignore it.
-				return true;
-			}
 			return false;
+		}
+
+		bool RegNeedsCustomHandling(const std::string &trace_reg_name) const override {
+			return trace_reg_name == "state";
+		}
+
+		void CustomRegSetup(RzReg *rz_reg, const std::string &trace_reg_name, const RzBitVector *trace_bv) const override {
+			if (trace_reg_name != "state") {
+				return;
+			}
+			// QEMU encodes icc, xcc, asi, pstate and cwp in state.
+      uint64_t state = rz_bv_to_ut64(trace_bv);
+      uint64_t cwp = state & 0xff;
+      uint64_t pstate = (state >> 8) & 0xfff;
+      uint64_t asi = (state >> 24) & 0xff;
+      uint64_t ccr = (state >> 32) & 0xff;
+
+			RzRegItem *reg_cwp = rz_reg_get(rz_reg, "cwp", RZ_REG_TYPE_ANY);
+			RzRegItem *reg_asi = rz_reg_get(rz_reg, "asi", RZ_REG_TYPE_ANY);
+			RzRegItem *reg_pstate = rz_reg_get(rz_reg, "pstate", RZ_REG_TYPE_ANY);
+			RzRegItem *reg_ccr = rz_reg_get(rz_reg, "ccr", RZ_REG_TYPE_ANY);
+			assert(reg_cwp && reg_asi && reg_pstate && reg_ccr);
+
+			rz_reg_set_bv(rz_reg, reg_cwp, rz_bv_new_from_ut64(reg_cwp->size, cwp));
+			rz_reg_set_bv(rz_reg, reg_asi, rz_bv_new_from_ut64(reg_asi->size, asi));
+			rz_reg_set_bv(rz_reg, reg_pstate, rz_bv_new_from_ut64(reg_pstate->size, pstate));
+			rz_reg_set_bv(rz_reg, reg_ccr, rz_bv_new_from_ut64(reg_ccr->size, ccr));
+		}
+
+		bool CustomRegCompare(RzReg *rz_reg,
+		                      const std::string &trace_reg_name,
+		                      const RzBitVector *trace_bv,
+		                      RZ_OUT char **mismatch_name,
+		                      RZ_OUT char **mismatch_val) const override {
+			assert(trace_reg_name == "state");
+      uint64_t state = rz_bv_to_ut64(trace_bv);
+      uint64_t cwp = state & 0xff;
+      uint64_t pstate = (state >> 8) & 0xfff;
+      uint64_t asi = (state >> 24) & 0xff;
+      uint64_t ccr = (state >> 32) & 0xff;
+
+			RzRegItem *reg_cwp = rz_reg_get(rz_reg, "cwp", RZ_REG_TYPE_ANY);
+			RzBitVector *cwp_val = rz_reg_get_bv(rz_reg, reg_cwp);
+			RzBitVector *cwp_expected = rz_bv_new_from_ut64(reg_cwp->size, cwp);
+			if (!rz_bv_eq(cwp_val, cwp_expected)) {
+				*mismatch_name = rz_str_dup("cwp");
+				*mismatch_val = rz_bv_as_hex_string(cwp_val, true);
+				rz_bv_free(cwp_val);
+				rz_bv_free(cwp_expected);
+				return false;
+			}
+
+			RzRegItem *reg_asi = rz_reg_get(rz_reg, "asi", RZ_REG_TYPE_ANY);
+			RzBitVector *asi_val = rz_reg_get_bv(rz_reg, reg_asi);
+			RzBitVector *asi_expected = rz_bv_new_from_ut64(reg_asi->size, asi);
+			if (!rz_bv_eq(asi_val, asi_expected)) {
+				*mismatch_name = rz_str_dup("asi");
+				*mismatch_val = rz_bv_as_hex_string(asi_val, true);
+				rz_bv_free(asi_val);
+				rz_bv_free(asi_expected);
+				return false;
+			}
+
+			RzRegItem *reg_pstate = rz_reg_get(rz_reg, "pstate", RZ_REG_TYPE_ANY);
+			RzBitVector *pstate_val = rz_reg_get_bv(rz_reg, reg_pstate);
+			RzBitVector *pstate_expected = rz_bv_new_from_ut64(reg_pstate->size, pstate);
+			if (!rz_bv_eq(pstate_val, pstate_expected)) {
+				*mismatch_name = rz_str_dup("pstate");
+				*mismatch_val = rz_bv_as_hex_string(pstate_val, true);
+				rz_bv_free(pstate_val);
+				rz_bv_free(pstate_expected);
+				return false;
+			}
+
+			RzRegItem *reg_ccr = rz_reg_get(rz_reg, "ccr", RZ_REG_TYPE_ANY);
+			RzBitVector *ccr_val = rz_reg_get_bv(rz_reg, reg_ccr);
+			RzBitVector *ccr_expected = rz_bv_new_from_ut64(reg_ccr->size, ccr);
+			if (!rz_bv_eq(ccr_val, ccr_expected)) {
+				*mismatch_name = rz_str_dup("ccr");
+				*mismatch_val = rz_bv_as_hex_string(ccr_val, true);
+				rz_bv_free(ccr_val);
+				rz_bv_free(ccr_expected);
+				return false;
+			}
+			return true;
 		}
 
 		bool IgnorePCMismatch(ut64 pc_actual, ut64 pc_expect) const override {

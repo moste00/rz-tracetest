@@ -4,6 +4,7 @@
 #ifndef _TRACEADAPTER_H
 #define _TRACEADAPTER_H
 
+#include <rz_util/rz_bitvector.h>
 #include <trace.container.hpp>
 
 #include <rz_util.h>
@@ -167,6 +168,41 @@ class TraceAdapter {
 		 * \return false Notify the user about the missing register in Rizin.
 		 */
 		virtual bool IgnoreUnknownReg(const std::string &trace_reg_name) const;
+
+		/**
+		 * \brief Returns true of the Adapter has to setup and comapre the register.
+		 * This is useful if a single register from the trace maps to several
+		 * registers in Rizin or the other way around.
+		 *
+		 * \param trace_reg_name The trace register name.
+		 *
+		 * \return true The register is setup by the adapter.
+		 * \return false Default handling for this register.
+		 */
+		virtual bool RegNeedsCustomHandling(const std::string &trace_reg_name) const { return false; }
+
+		/**
+		 * \brief Adapter custom setup of a given trace register.
+		 *
+		 * \param rz_reg The RzReg instance of Rizin to update.
+		 * \param trace_reg_name The trace register name.
+		 * \param trace_bv The value of the trace register.
+		 */
+		virtual void CustomRegSetup(RzReg *rz_reg, const std::string &trace_reg_name, const RzBitVector *trace_bv) const { return; }
+
+		/**
+		 * \brief Adapter custom setup of a given trace register.
+		 *
+		 * \param rz_reg The RzReg instance of Rizin to update.
+		 * \param trace_reg_name The trace register name.
+		 * \param trace_bv The value of the trace register.
+		 * \param mismatch_name The register name in Rizin which doesn't match. NULL if match was successful.
+		 * \param mismatch_value The register value in Rizin which doesn't match. NULL if match was successful.
+		 *
+		 * \return true If the custom comparison matches.
+		 * \return false In case of mismatch.
+		 */
+		virtual bool CustomRegCompare(RzReg *rz_reg, const std::string &trace_reg_name, const RzBitVector *trace_bv, RZ_OUT char **mismatch_name, RZ_OUT char **mismatch_val) const { return false; }
 
 		/**
 		 * \brief Returns if a post state mismatch
