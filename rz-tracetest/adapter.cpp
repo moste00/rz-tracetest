@@ -190,6 +190,19 @@ class Sparc32TraceAdapter : public TraceAdapter {
 			return tracereg;
 		}
 
+		bool IgnoreEvent(const RzILEvent *event) const override {
+			// Ignore all writes which didn't change anything.
+			switch (event->type) {
+			default:
+				return false;
+			case RZ_IL_EVENT_VAR_READ:
+				return false;
+			case RZ_IL_EVENT_VAR_WRITE:
+				return rz_il_value_eq(event->data.var_write.old_value, event->data.var_write.new_value);
+			}
+			return false;
+		};
+
 		// We ignore all writes and reads to PC or NPC.
 		// Due to the inability of the QEMU trace to properly
 		// log delayed branches, we need to test them separatly.
@@ -212,6 +225,19 @@ class Sparc64TraceAdapter : public TraceAdapter {
 		std::string TraceRegToRizin(const std::string &tracereg) const override {
 			return tracereg;
 		}
+
+		bool IgnoreEvent(const RzILEvent *event) const override {
+			// Ignore all writes which didn't change anything.
+			switch (event->type) {
+			default:
+				return false;
+			case RZ_IL_EVENT_VAR_READ:
+				return false;
+			case RZ_IL_EVENT_VAR_WRITE:
+				return rz_il_value_eq(event->data.var_write.old_value, event->data.var_write.new_value);
+			}
+			return false;
+		};
 
 		bool IgnoreUnknownReg(const std::string &trace_reg_name) const override {
 			if (trace_reg_name == "state") {
@@ -419,7 +445,7 @@ class HexagonTraceAdapter : public TraceAdapter {
 			return true;
 		}
 
-		bool IgnoreEvent(const RzILEvent *event) const {
+		bool IgnoreEvent(const RzILEvent *event) const override {
 			// We ignore all writes and reads to .new register for now, because they
 			// get optimized away by QEMU for some instrucions.
 			switch (event->type) {
@@ -451,7 +477,6 @@ class HexagonTraceAdapter : public TraceAdapter {
 			}
 			return false;
 		};
-
 };
 
 class X86TraceAdapter : public TraceAdapter {
