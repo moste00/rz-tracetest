@@ -180,7 +180,6 @@ class Arm64TraceAdapter : public TraceAdapter {
 		}
 };
 
-
 class Sparc32TraceAdapter : public TraceAdapter {
 	public:
 		std::string RizinArch() const override { return "sparc"; }
@@ -263,11 +262,11 @@ class Sparc64TraceAdapter : public TraceAdapter {
 				return;
 			}
 			// QEMU encodes icc, xcc, asi, pstate and cwp in state.
-      uint64_t state = rz_bv_to_ut64(trace_bv);
-      uint64_t cwp = state & 0xff;
-      uint64_t pstate = (state >> 8) & 0xfff;
-      uint64_t asi = (state >> 24) & 0xff;
-      uint64_t ccr = (state >> 32) & 0xff;
+			uint64_t state = rz_bv_to_ut64(trace_bv);
+			uint64_t cwp = state & 0xff;
+			uint64_t pstate = (state >> 8) & 0xfff;
+			uint64_t asi = (state >> 24) & 0xff;
+			uint64_t ccr = (state >> 32) & 0xff;
 
 			RzRegItem *reg_cwp = rz_reg_get(rz_reg, "cwp", RZ_REG_TYPE_ANY);
 			RzRegItem *reg_asi = rz_reg_get(rz_reg, "asi", RZ_REG_TYPE_ANY);
@@ -282,16 +281,16 @@ class Sparc64TraceAdapter : public TraceAdapter {
 		}
 
 		bool CustomRegCompare(RzReg *rz_reg,
-		                      const std::string &trace_reg_name,
-		                      const RzBitVector *trace_bv,
-		                      RZ_OUT char **mismatch_name,
-		                      RZ_OUT char **mismatch_val) const override {
+			const std::string &trace_reg_name,
+			const RzBitVector *trace_bv,
+			RZ_OUT char **mismatch_name,
+			RZ_OUT char **mismatch_val) const override {
 			assert(trace_reg_name == "state");
-      uint64_t state = rz_bv_to_ut64(trace_bv);
-      uint64_t cwp = state & 0xff;
-      uint64_t pstate = (state >> 8) & 0xfff;
-      uint64_t asi = (state >> 24) & 0xff;
-      uint64_t ccr = (state >> 32) & 0xff;
+			uint64_t state = rz_bv_to_ut64(trace_bv);
+			uint64_t cwp = state & 0xff;
+			uint64_t pstate = (state >> 8) & 0xfff;
+			uint64_t asi = (state >> 24) & 0xff;
+			uint64_t ccr = (state >> 32) & 0xff;
 
 			RzRegItem *reg_cwp = rz_reg_get(rz_reg, "cwp", RZ_REG_TYPE_ANY);
 			RzBitVector *cwp_val = rz_reg_get_bv(rz_reg, reg_cwp);
@@ -571,23 +570,23 @@ class HexagonTraceAdapter : public TraceAdapter {
 };
 
 class X86TraceAdapter : public TraceAdapter {
-	std::string RizinArch() const override {
-		return "x86";
-	}
+		std::string RizinArch() const override {
+			return "x86";
+		}
 
-	int RizinBits(std::optional<std::string> mode, std::optional<uint64_t> machine) const override {
-		return (machine && machine.value() == frame_mach_x86_64) ? 64 : 32;
-	}
+		int RizinBits(std::optional<std::string> mode, std::optional<uint64_t> machine) const override {
+			return (machine && machine.value() == frame_mach_x86_64) ? 64 : 32;
+		}
 
-	bool IgnorePCMismatch(ut64 pc_actual, ut64 pc_expect) const override {
-		return false;
-	}
+		bool IgnorePCMismatch(ut64 pc_actual, ut64 pc_expect) const override {
+			return false;
+		}
 
-	virtual std::string TraceRegToRizin(const std::string &tracereg) const override {
-		std::string r = tracereg;
-		std::transform(r.begin(), r.end(), r.begin(), ::tolower);
-		return r;
-	}
+		virtual std::string TraceRegToRizin(const std::string &tracereg) const override {
+			std::string r = tracereg;
+			std::transform(r.begin(), r.end(), r.begin(), ::tolower);
+			return r;
+		}
 };
 
 std::unique_ptr<TraceAdapter> SelectTraceAdapter(frame_architecture arch, size_t mach) {
