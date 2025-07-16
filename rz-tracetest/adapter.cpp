@@ -199,7 +199,9 @@ class Sparc32TraceAdapter : public TraceAdapter {
 			case RZ_IL_EVENT_VAR_READ:
 				return false;
 			case RZ_IL_EVENT_VAR_WRITE:
-				return rz_il_value_eq(event->data.var_write.old_value, event->data.var_write.new_value);
+				return rz_il_value_eq(event->data.var_write.old_value, event->data.var_write.new_value) ||
+					// See below for Post mismatch exception.
+					RZ_STR_EQ(event->data.var_write.variable, "cwp");
 			case RZ_IL_EVENT_MEM_WRITE:
 				// The memory region 1 is Rizin's region to backup register content for read and write.
 				return event->data.mem_write.index == 1; // = SPARC_ASI_INDEX_RW
@@ -215,7 +217,10 @@ class Sparc32TraceAdapter : public TraceAdapter {
 		}
 
 		virtual bool IgnorePostMismatchReg(const std::string &rz_reg_name) const override {
-			return rz_reg_name == "pc" || rz_reg_name == "npc";
+			return rz_reg_name == "pc" || rz_reg_name == "npc" ||
+				// See the passive aggressive comment below for the same case
+				// of the Sparc64 adapter. I stick with increment only for now.
+				rz_reg_name == "cwp";
 		}
 };
 
@@ -241,7 +246,9 @@ class Sparc64TraceAdapter : public TraceAdapter {
 				return RZ_STR_EQ(var_name, "cwp") || RZ_STR_EQ(var_name, "ccr") || RZ_STR_EQ(var_name, "pstate") || RZ_STR_EQ(var_name, "asi");
 			}
 			case RZ_IL_EVENT_VAR_WRITE:
-				return rz_il_value_eq(event->data.var_write.old_value, event->data.var_write.new_value);
+				return rz_il_value_eq(event->data.var_write.old_value, event->data.var_write.new_value) ||
+					// See below for Post mismatch exception.
+					RZ_STR_EQ(event->data.var_write.variable, "cwp");
 			case RZ_IL_EVENT_MEM_WRITE:
 				// The memory region 1 is Rizin's region to backup register content for read and write.
 				return event->data.mem_write.index == 1; // = SPARC_ASI_INDEX_RW
@@ -343,7 +350,17 @@ class Sparc64TraceAdapter : public TraceAdapter {
 		}
 
 		virtual bool IgnorePostMismatchReg(const std::string &rz_reg_name) const override {
-			return rz_reg_name == "pc" || rz_reg_name == "npc";
+			return rz_reg_name == "pc" || rz_reg_name == "npc" ||
+				// See, the thing is that QEMU uses CWP a little bit differently.
+				// It increments it on RETT/RESTORE and decrements it on SAVE.
+				// This is likely because in Sparc V8 it was this way.
+				// But in v9 it is the other way round.
+				// I ignore these event now here.
+				// Because I didn't model spill overs of reg windows
+				// and also not the traps around these instructions.
+				// It is just endless reg windows.
+				// So for now it means: ¯\_(ツ)_/¯
+				rz_reg_name == "cwp";
 		}
 };
 

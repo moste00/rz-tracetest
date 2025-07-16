@@ -422,7 +422,7 @@ FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut6
 				char *mismatching_reg = NULL;
 				char *mismatching_val = NULL;
 				RzBitVector *bv = rz_bv_new_from_bytes_le((const ut8 *)o.value().data(), 0, RegOperandSizeBits(o));
-				if (!adapter->CustomRegCompare(reg.get(), ro.name(), bv, &mismatching_reg, &mismatching_val)) {
+				if (!adapter->CustomRegCompare(reg.get(), ro.name(), bv, &mismatching_reg, &mismatching_val) && !adapter->IgnorePostMismatchReg(mismatching_reg)) {
 					mismatched();
 					char *ts = rz_hex_bin2strdup((const ut8 *)o.value().data(), bv->len / 8);
 					print_reg_mismatch_msg(mismatching_reg, ro.name().c_str(), mismatching_val, ts);
