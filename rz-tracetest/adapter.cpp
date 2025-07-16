@@ -626,11 +626,16 @@ std::unique_ptr<TraceAdapter> SelectTraceAdapter(frame_architecture arch, size_t
 		return std::unique_ptr<TraceAdapter>(new HexagonTraceAdapter());
 	case frame_arch_i386:
 		return std::unique_ptr<TraceAdapter>(new X86TraceAdapter());
-	case frame_arch_sparc:
-		if (frame_mach_sparc_v9_p(mach) != 0) {
-			return std::unique_ptr<TraceAdapter>(new Sparc64TraceAdapter());
+	case frame_arch_sparc: {
+		std::unique_ptr<TraceAdapter> adapter;
+		if (frame_mach_sparc_64bit_p(mach) != 0) {
+			adapter = std::unique_ptr<TraceAdapter>(new Sparc64TraceAdapter());
+		} else {
+			adapter = std::unique_ptr<TraceAdapter>(new Sparc32TraceAdapter());
 		}
-		return std::unique_ptr<TraceAdapter>(new Sparc32TraceAdapter());
+		adapter->SetIsBigEndian(mach == frame_mach_sparc_sparclite_le ? false : true);
+		return adapter;
+	}
 	default:
 		return nullptr;
 	}
