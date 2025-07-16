@@ -28,6 +28,7 @@ RizinEmulator::RizinEmulator(std::unique_ptr<TraceAdapter> adapter_arg)
 		rz_config_set_i(core->config, "asm.bits", bits);
 	}
 	rz_config_set_b(core->config, "cfg.bigendian", adapter->IsBigEndian());
+	reg->big_endian = adapter->IsBigEndian();
 	char *reg_profile = rz_analysis_get_reg_profile(core->analysis);
 	if (!reg_profile) {
 		throw RizinException("Failed to get reg profile.");

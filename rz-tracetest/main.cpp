@@ -12,7 +12,7 @@ static int help(bool verbose) {
 	if (verbose) {
 		printf(" -c [count]    number of frames to check, default: all\n");
 		printf(" -d            dump trace as text, but do not run or test anything\n");
-		printf(" -b            Interpret instruction bytes in the frames in big endian\n");
+		printf(" -b            Interpret trace from a big endian architecture.\n");
 		printf(" -e            fail early/stop at the first error\n");
 		printf(" -u            fail early/stop at the first unlifted execption\n");
 		printf(" -r            fail early/stop at the first runtime error\n");
