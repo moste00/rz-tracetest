@@ -201,11 +201,16 @@ class Sparc32TraceAdapter : public TraceAdapter {
 			switch (event->type) {
 			default:
 				return false;
-			case RZ_IL_EVENT_VAR_READ:
-				return false;
-			case RZ_IL_EVENT_VAR_WRITE:
-				// See below for Post mismatch exception.
-				return RZ_STR_EQ(event->data.var_write.variable, "cwp");
+			case RZ_IL_EVENT_VAR_READ: {
+				// These registers don't exist in the QEMU.
+				const char *var_name = event->data.var_read.variable;
+				return RZ_STR_EQ(var_name, "cwp") || RZ_STR_EQ(var_name, "ccr") || RZ_STR_EQ(var_name, "pstate") || RZ_STR_EQ(var_name, "asi");
+			}
+			case RZ_IL_EVENT_VAR_WRITE: {
+				// These registers don't exist in the QEMU.
+				const char *var_name = event->data.var_write.variable;
+				return RZ_STR_EQ(var_name, "cwp") || RZ_STR_EQ(var_name, "ccr") || RZ_STR_EQ(var_name, "pstate") || RZ_STR_EQ(var_name, "asi");
+			}
 			case RZ_IL_EVENT_MEM_WRITE:
 				// The memory region 1 is Rizin's region to backup register content for read and write.
 				return event->data.mem_write.index == 1; // = SPARC_ASI_INDEX_RW
@@ -253,9 +258,11 @@ class Sparc64TraceAdapter : public TraceAdapter {
 				const char *var_name = event->data.var_read.variable;
 				return RZ_STR_EQ(var_name, "cwp") || RZ_STR_EQ(var_name, "ccr") || RZ_STR_EQ(var_name, "pstate") || RZ_STR_EQ(var_name, "asi");
 			}
-			case RZ_IL_EVENT_VAR_WRITE:
-				// See below for Post mismatch exception.
-				return RZ_STR_EQ(event->data.var_write.variable, "cwp");
+			case RZ_IL_EVENT_VAR_WRITE: {
+				// These registers don't exist in the QEMU.
+				const char *var_name = event->data.var_write.variable;
+				return RZ_STR_EQ(var_name, "cwp") || RZ_STR_EQ(var_name, "ccr") || RZ_STR_EQ(var_name, "pstate") || RZ_STR_EQ(var_name, "asi");
+			}
 			case RZ_IL_EVENT_MEM_WRITE:
 				// The memory region 1 is Rizin's region to backup register content for read and write.
 				return event->data.mem_write.index == 1; // = SPARC_ASI_INDEX_RW
