@@ -196,7 +196,7 @@ class Sparc32TraceAdapter : public TraceAdapter {
 			return true;
 		}
 
-		bool IgnoreEvent(const RzILEvent *event) const override {
+		bool AssumeEventIsJustified(const RzILEvent *event) const override {
 			// Ignore all writes which didn't change anything.
 			switch (event->type) {
 			default:
@@ -243,7 +243,7 @@ class Sparc64TraceAdapter : public TraceAdapter {
 			return true;
 		}
 
-		bool IgnoreEvent(const RzILEvent *event) const override {
+		bool AssumeEventIsJustified(const RzILEvent *event) const override {
 			// Ignore all writes which didn't change anything.
 			switch (event->type) {
 			default:
@@ -548,7 +548,7 @@ class HexagonTraceAdapter : public TraceAdapter {
 			return true;
 		}
 
-		bool IgnoreEvent(const RzILEvent *event) const override {
+		bool AssumeEventIsJustified(const RzILEvent *event) const override {
 			// We ignore all writes and reads to .new register for now, because they
 			// get optimized away by QEMU for some instrucions.
 			switch (event->type) {

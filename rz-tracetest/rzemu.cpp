@@ -504,7 +504,7 @@ FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut6
 	rz_pvector_foreach (vm->vm->events, it) {
 		RzILEvent *ev = *((RzILEvent **)it);
 		bool justified = false;
-		if (adapter->IgnoreEvent(ev)) {
+		if (adapter->AssumeEventIsJustified(ev)) {
 			evi++;
 			justified = true;
 			continue;
