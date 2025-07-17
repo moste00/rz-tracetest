@@ -6,6 +6,7 @@
 #include <memory>
 #include <rz_util/rz_bitvector.h>
 #include <rz_util/rz_hex.h>
+#include <rz_util/rz_strbuf.h>
 
 static inline bool IsOneBitFlag(const std::string &tn) {
 	// PPC
@@ -264,6 +265,27 @@ class Sparc64TraceAdapter : public TraceAdapter {
 			return trace_reg_name == "state";
 		}
 
+		void CompareSubreg(RzReg *rz_reg_instance, const char *rz_subreg_name, ut64 rexpected, RzStrBuf *miss_name, RzStrBuf *miss_val) override {
+			RzRegItem *rz_reg_item = rz_reg_get(rz_reg_instance, rz_subreg_name, RZ_REG_TYPE_ANY);
+			RzBitVector *actual_val = rz_reg_get_bv(rz_reg_instance, rz_reg_item);
+			RzBitVector *expected_val = rz_bv_new_from_ut64(rz_reg_item->size, rexpected);
+			if (!rz_bv_eq(actual_val, expected_val) && !IgnorePostMismatchReg(rz_subreg_name)) {
+				if (rz_strbuf_length(miss_name) > 0) {
+					rz_strbuf_append(miss_name, " | ");
+				}
+				rz_strbuf_append(miss_name, rz_subreg_name);
+				char *tmp = rz_bv_as_hex_string(actual_val, true);
+				if (rz_strbuf_length(miss_val) > 0) {
+					rz_strbuf_append(miss_val, " | ");
+				}
+				rz_strbuf_append(miss_val, tmp);
+				free(tmp);
+				failed_custom_compare = true;
+			}
+			rz_bv_free(actual_val);
+			rz_bv_free(expected_val);
+		}
+
 		void CustomRegSetup(RzReg *rz_reg, const std::string &trace_reg_name, const RzBitVector *trace_bv) const override {
 			if (trace_reg_name != "state") {
 				return;
@@ -291,58 +313,26 @@ class Sparc64TraceAdapter : public TraceAdapter {
 			const std::string &trace_reg_name,
 			const RzBitVector *trace_bv,
 			RZ_OUT char **mismatch_name,
-			RZ_OUT char **mismatch_val) const override {
+			RZ_OUT char **mismatch_val) override {
 			assert(trace_reg_name == "state");
 			uint64_t state = rz_bv_to_ut64(trace_bv);
-			uint64_t cwp = state & 0xff;
-			uint64_t pstate = (state >> 8) & 0xfff;
-			uint64_t asi = (state >> 24) & 0xff;
-			uint64_t ccr = (state >> 32) & 0xff;
+			uint64_t cwp_expected = state & 0xff;
+			uint64_t pstate_expected = (state >> 8) & 0xfff;
+			uint64_t asi_expected = (state >> 24) & 0xff;
+			uint64_t ccr_expected = (state >> 32) & 0xff;
 
-			RzRegItem *reg_cwp = rz_reg_get(rz_reg, "cwp", RZ_REG_TYPE_ANY);
-			RzBitVector *cwp_val = rz_reg_get_bv(rz_reg, reg_cwp);
-			RzBitVector *cwp_expected = rz_bv_new_from_ut64(reg_cwp->size, cwp);
-			if (!rz_bv_eq(cwp_val, cwp_expected)) {
-				*mismatch_name = rz_str_dup("cwp");
-				*mismatch_val = rz_bv_as_hex_string(cwp_val, true);
-				rz_bv_free(cwp_val);
-				rz_bv_free(cwp_expected);
-				return false;
-			}
+			RzStrBuf *miss_name = rz_strbuf_new("");
+			RzStrBuf *miss_val = rz_strbuf_new("");
 
-			RzRegItem *reg_asi = rz_reg_get(rz_reg, "asi", RZ_REG_TYPE_ANY);
-			RzBitVector *asi_val = rz_reg_get_bv(rz_reg, reg_asi);
-			RzBitVector *asi_expected = rz_bv_new_from_ut64(reg_asi->size, asi);
-			if (!rz_bv_eq(asi_val, asi_expected)) {
-				*mismatch_name = rz_str_dup("asi");
-				*mismatch_val = rz_bv_as_hex_string(asi_val, true);
-				rz_bv_free(asi_val);
-				rz_bv_free(asi_expected);
-				return false;
-			}
+			failed_custom_compare = false;
+			CompareSubreg(rz_reg, "cwp", cwp_expected, miss_name, miss_val);
+			CompareSubreg(rz_reg, "asi", asi_expected, miss_name, miss_val);
+			CompareSubreg(rz_reg, "pstate", pstate_expected, miss_name, miss_val);
+			CompareSubreg(rz_reg, "ccr", ccr_expected, miss_name, miss_val);
 
-			RzRegItem *reg_pstate = rz_reg_get(rz_reg, "pstate", RZ_REG_TYPE_ANY);
-			RzBitVector *pstate_val = rz_reg_get_bv(rz_reg, reg_pstate);
-			RzBitVector *pstate_expected = rz_bv_new_from_ut64(reg_pstate->size, pstate);
-			if (!rz_bv_eq(pstate_val, pstate_expected)) {
-				*mismatch_name = rz_str_dup("pstate");
-				*mismatch_val = rz_bv_as_hex_string(pstate_val, true);
-				rz_bv_free(pstate_val);
-				rz_bv_free(pstate_expected);
-				return false;
-			}
-
-			RzRegItem *reg_ccr = rz_reg_get(rz_reg, "ccr", RZ_REG_TYPE_ANY);
-			RzBitVector *ccr_val = rz_reg_get_bv(rz_reg, reg_ccr);
-			RzBitVector *ccr_expected = rz_bv_new_from_ut64(reg_ccr->size, ccr);
-			if (!rz_bv_eq(ccr_val, ccr_expected)) {
-				*mismatch_name = rz_str_dup("ccr");
-				*mismatch_val = rz_bv_as_hex_string(ccr_val, true);
-				rz_bv_free(ccr_val);
-				rz_bv_free(ccr_expected);
-				return false;
-			}
-			return true;
+			*mismatch_name = rz_strbuf_drain(miss_name);
+			*mismatch_val = rz_strbuf_drain(miss_val);
+			return failed_custom_compare == false;
 		}
 
 		bool IgnorePCMismatch(ut64 pc_actual, ut64 pc_expect) const override {

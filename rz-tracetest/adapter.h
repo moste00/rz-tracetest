@@ -87,6 +87,10 @@ static struct reg_name_mapping hexagon_reg_mapping[] {
  * Interface for any arch/source/... specific adjustments
  */
 class TraceAdapter {
+	protected:
+		bool failed_custom_compare = false;
+		virtual void CompareSubreg(RzReg *rz_reg, const char *rname, ut64 rexpected, RzStrBuf *miss_name, RzStrBuf *miss_val) {}
+
 	public:
 		virtual ~TraceAdapter() {}
 
@@ -202,7 +206,7 @@ class TraceAdapter {
 		 * \return true If the custom comparison matches.
 		 * \return false In case of mismatch.
 		 */
-		virtual bool CustomRegCompare(RzReg *rz_reg, const std::string &trace_reg_name, const RzBitVector *trace_bv, RZ_OUT char **mismatch_name, RZ_OUT char **mismatch_val) const { return false; }
+		virtual bool CustomRegCompare(RzReg *rz_reg, const std::string &trace_reg_name, const RzBitVector *trace_bv, RZ_OUT char **mismatch_name, RZ_OUT char **mismatch_val) { return false; }
 
 		/**
 		 * \brief Returns if a post state mismatch
