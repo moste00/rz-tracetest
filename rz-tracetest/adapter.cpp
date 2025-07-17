@@ -192,6 +192,10 @@ class Sparc32TraceAdapter : public TraceAdapter {
 			return tracereg;
 		}
 
+		bool AllowNoOperandSameValueAssignment() const override {
+			return true;
+		}
+
 		bool IgnoreEvent(const RzILEvent *event) const override {
 			// Ignore all writes which didn't change anything.
 			switch (event->type) {
@@ -200,9 +204,8 @@ class Sparc32TraceAdapter : public TraceAdapter {
 			case RZ_IL_EVENT_VAR_READ:
 				return false;
 			case RZ_IL_EVENT_VAR_WRITE:
-				return rz_il_value_eq(event->data.var_write.old_value, event->data.var_write.new_value) ||
-					// See below for Post mismatch exception.
-					RZ_STR_EQ(event->data.var_write.variable, "cwp");
+				// See below for Post mismatch exception.
+				return RZ_STR_EQ(event->data.var_write.variable, "cwp");
 			case RZ_IL_EVENT_MEM_WRITE:
 				// The memory region 1 is Rizin's region to backup register content for read and write.
 				return event->data.mem_write.index == 1; // = SPARC_ASI_INDEX_RW
@@ -236,6 +239,10 @@ class Sparc64TraceAdapter : public TraceAdapter {
 			return tracereg;
 		}
 
+		bool AllowNoOperandSameValueAssignment() const override {
+			return true;
+		}
+
 		bool IgnoreEvent(const RzILEvent *event) const override {
 			// Ignore all writes which didn't change anything.
 			switch (event->type) {
@@ -247,9 +254,8 @@ class Sparc64TraceAdapter : public TraceAdapter {
 				return RZ_STR_EQ(var_name, "cwp") || RZ_STR_EQ(var_name, "ccr") || RZ_STR_EQ(var_name, "pstate") || RZ_STR_EQ(var_name, "asi");
 			}
 			case RZ_IL_EVENT_VAR_WRITE:
-				return rz_il_value_eq(event->data.var_write.old_value, event->data.var_write.new_value) ||
-					// See below for Post mismatch exception.
-					RZ_STR_EQ(event->data.var_write.variable, "cwp");
+				// See below for Post mismatch exception.
+				return RZ_STR_EQ(event->data.var_write.variable, "cwp");
 			case RZ_IL_EVENT_MEM_WRITE:
 				// The memory region 1 is Rizin's region to backup register content for read and write.
 				return event->data.mem_write.index == 1; // = SPARC_ASI_INDEX_RW
