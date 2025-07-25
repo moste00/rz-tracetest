@@ -56,11 +56,26 @@ static void PrintEvent(ut64 index, const RzILEvent *ev) {
 	rz_strbuf_fini(&sb);
 }
 
-static bool MemAccessJustifiedByOperands(RzBitVector *address, ut32 bits, const operand_value_list &operands) {
+/**
+ * \brief Check if 1 or more memory operand in \p operands
+ * overlap with the value access of \p address and \p val.
+ * If 1+ memory operands in the frame also access the same address
+ * up until end of \p val (overlap with it), the memory access of the VM is justified.
+ * The memory value is not compared!
+ *
+ * \param address The RzIL VM memory addressed accessed.
+ * \param val The memory value the RzIL VM wrote/read.
+ * \param operands The operands of the frame. Can be Pre- or Post-operands.
+ *
+ * \return True if one ore more \p operands overlap the same memory as \p address and \p val.
+ * \return False otherwise.
+ */
+static bool MemAccessJustifiedByOperands(RzBitVector *address, ut32 val, const operand_value_list &operands) {
 	ut64 addr = rz_bv_to_ut64(address);
-	ut64 size = (bits + 7) / 8; // round IL accesses up to be on the safe side
+	ut64 size = (val + 7) / 8; // round IL accesses up to be on the safe side
 	bool improved = false; // whether a new piece of the access was justified in the last iteration
 	do {
+		improved = false;
 		for (const auto &o : operands.elem()) {
 			if (!o.operand_info_specific().has_mem_operand()) {
 				continue;
