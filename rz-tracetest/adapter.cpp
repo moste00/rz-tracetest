@@ -219,13 +219,16 @@ class Sparc32TraceAdapter : public TraceAdapter {
 		};
 
 		void AdjustRegContentsFromTrace(const std::string &tracename, RzBitVector *trace_val, RzAnalysisOp *op = nullptr) const override {
-			if (tracename != "fsr") {
+			if (tracename == "fprs") {
+				trace_val->len = 3;
+				return;
+			} else if (tracename == "fsr") {
+				size_t len = rz_bv_len(trace_val);
+				uint64_t fsr = rz_bv_to_ut64(trace_val);
+				// Remove the exception related fields until we have exception hooks.
+				rz_bv_set_from_ut64(trace_val, fsr & ~0x3ffull);
 				return;
 			}
-			size_t len = rz_bv_len(trace_val);
-			uint64_t fsr = rz_bv_to_ut64(trace_val);
-			// Remove the exception related fields until we have exception hooks.
-			rz_bv_set_from_ut64(trace_val, fsr & ~0x3ffull);
 		}
 
 		void AdjustRegContentsFromRizin(const std::string &tracename, RzBitVector *rizin_val) const override {
@@ -291,13 +294,16 @@ class Sparc64TraceAdapter : public TraceAdapter {
 		};
 
 		void AdjustRegContentsFromTrace(const std::string &tracename, RzBitVector *trace_val, RzAnalysisOp *op = nullptr) const override {
-			if (tracename != "fsr") {
+			if (tracename == "fprs") {
+				trace_val->len = 3;
+				return;
+			} else if (tracename == "fsr") {
+				size_t len = rz_bv_len(trace_val);
+				uint64_t fsr = rz_bv_to_ut64(trace_val);
+				// Remove the exception related fields until we have exception hooks.
+				rz_bv_set_from_ut64(trace_val, fsr & ~0x3ffull);
 				return;
 			}
-			size_t len = rz_bv_len(trace_val);
-			uint64_t fsr = rz_bv_to_ut64(trace_val);
-			// Remove the exception related fields until we have exception hooks.
-			rz_bv_set_from_ut64(trace_val, fsr & ~0x3ffull);
 		}
 
 		void AdjustRegContentsFromRizin(const std::string &tracename, RzBitVector *rizin_val) const override {
