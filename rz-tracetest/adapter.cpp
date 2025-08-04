@@ -220,7 +220,10 @@ class Sparc32TraceAdapter : public TraceAdapter {
 
 		void AdjustRegContentsFromTrace(const std::string &tracename, RzBitVector *trace_val, RzAnalysisOp *op = nullptr) const override {
 			if (tracename == "fprs") {
-				trace_val->len = 3;
+				ut8 v = rz_bv_to_ut8(trace_val);
+				rz_bv_fini(trace_val);
+				rz_bv_init(trace_val, 3);
+				rz_bv_set_from_ut64(trace_val, v);
 				return;
 			} else if (tracename == "fsr") {
 				size_t len = rz_bv_len(trace_val);
@@ -295,7 +298,10 @@ class Sparc64TraceAdapter : public TraceAdapter {
 
 		void AdjustRegContentsFromTrace(const std::string &tracename, RzBitVector *trace_val, RzAnalysisOp *op = nullptr) const override {
 			if (tracename == "fprs") {
-				trace_val->len = 3;
+				ut8 v = rz_bv_to_ut8(trace_val);
+				rz_bv_fini(trace_val);
+				rz_bv_init(trace_val, 3);
+				rz_bv_set_from_ut64(trace_val, v);
 				return;
 			} else if (tracename == "fsr") {
 				size_t len = rz_bv_len(trace_val);
