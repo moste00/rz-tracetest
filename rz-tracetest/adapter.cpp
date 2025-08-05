@@ -407,7 +407,7 @@ class Sparc64TraceAdapter : public TraceAdapter {
 		virtual bool IgnorePostMismatchReg(const std::string &rz_reg_name) const override {
 			return rz_reg_name == "pc" || rz_reg_name == "npc" ||
 				// See, the thing is that QEMU uses CWP a little bit differently.
-				// It increments it on RETT/RESTORE and decrements it on SAVE.
+				// It increments it on RET/RESTORE and decrements it on SAVE.
 				// This is likely because in Sparc V8 it was this way.
 				// But in v9 it is the other way round.
 				// I ignore these event now here.
