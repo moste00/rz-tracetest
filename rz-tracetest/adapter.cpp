@@ -277,7 +277,7 @@ class Sparc32TraceAdapter : public TraceAdapter {
 			}
 			// QEMU encodes icc, xcc, asi, ppsr and cwp in psr.
 			uint64_t psr = rz_bv_to_ut64(trace_bv);
-			uint64_t cwp = psr & 0xf;
+			uint64_t cwp = psr & 0x1f;
 			uint64_t ccr = (psr >> 20) & 0xf;
 
 			RzRegItem *reg_cwp = rz_reg_get(rz_reg, "cwp", RZ_REG_TYPE_ANY);
@@ -295,7 +295,7 @@ class Sparc32TraceAdapter : public TraceAdapter {
 			RZ_OUT char **mismatch_val) override {
 			assert(trace_reg_name == "psr");
 			uint64_t psr = rz_bv_to_ut64(trace_bv);
-			uint64_t cwp_expected = psr & 0xf;
+			uint64_t cwp_expected = psr & 0x1f;
 			uint64_t ccr_expected = (psr >> 20) & 0xf;
 
 			RzStrBuf *miss_name = rz_strbuf_new("");
