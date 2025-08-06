@@ -319,9 +319,6 @@ class Sparc32TraceAdapter : public TraceAdapter {
 
 		virtual bool IgnorePostMismatchReg(const std::string &rz_reg_name) const override {
 			return rz_reg_name == "pc" || rz_reg_name == "npc" ||
-				// See the passive aggressive comment below for the same case
-				// of the Sparc64 adapter. I stick with increment only for now.
-				rz_reg_name == "cwp" ||
 				// Doesn't exist in Sparc32, but is present in gdb.
 				rz_reg_name == "fprs";
 		}
@@ -473,17 +470,7 @@ class Sparc64TraceAdapter : public TraceAdapter {
 		}
 
 		virtual bool IgnorePostMismatchReg(const std::string &rz_reg_name) const override {
-			return rz_reg_name == "pc" || rz_reg_name == "npc" ||
-				// See, the thing is that QEMU uses CWP a little bit differently.
-				// It increments it on RET/RESTORE and decrements it on SAVE.
-				// This is likely because in Sparc V8 it was this way.
-				// But in v9 it is the other way round.
-				// I ignore these event now here.
-				// Because I didn't model spill overs of reg windows
-				// and also not the traps around these instructions.
-				// It is just endless reg windows.
-				// So for now it means: ¯\_(ツ)_/¯
-				rz_reg_name == "cwp";
+			return rz_reg_name == "pc" || rz_reg_name == "npc";
 		}
 };
 
