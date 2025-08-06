@@ -204,12 +204,12 @@ class Sparc32TraceAdapter : public TraceAdapter {
 			case RZ_IL_EVENT_VAR_READ: {
 				// These registers don't exist in the QEMU.
 				const char *var_name = event->data.var_read.variable;
-				return RZ_STR_EQ(var_name, "cwp") || RZ_STR_EQ(var_name, "ccr") || RZ_STR_EQ(var_name, "pstate") || RZ_STR_EQ(var_name, "asi");
+				return RZ_STR_EQ(var_name, "cwp") || RZ_STR_EQ(var_name, "ccr") || RZ_STR_EQ(var_name, "pstate") || RZ_STR_EQ(var_name, "asi") || RZ_STR_EQ(var_name, "fprs");
 			}
 			case RZ_IL_EVENT_VAR_WRITE: {
 				// These registers don't exist in the QEMU.
 				const char *var_name = event->data.var_write.variable;
-				return RZ_STR_EQ(var_name, "cwp") || RZ_STR_EQ(var_name, "ccr") || RZ_STR_EQ(var_name, "pstate") || RZ_STR_EQ(var_name, "asi");
+				return RZ_STR_EQ(var_name, "cwp") || RZ_STR_EQ(var_name, "ccr") || RZ_STR_EQ(var_name, "pstate") || RZ_STR_EQ(var_name, "asi") || RZ_STR_EQ(var_name, "fprs");
 			}
 			case RZ_IL_EVENT_MEM_WRITE:
 				// The memory region 1 is Rizin's region to backup register content for read and write.
@@ -219,13 +219,7 @@ class Sparc32TraceAdapter : public TraceAdapter {
 		};
 
 		void AdjustRegContentsFromTrace(const std::string &tracename, RzBitVector *trace_val, RzAnalysisOp *op = nullptr) const override {
-			if (tracename == "fprs") {
-				ut8 v = rz_bv_to_ut8(trace_val);
-				rz_bv_fini(trace_val);
-				rz_bv_init(trace_val, 3);
-				rz_bv_set_from_ut64(trace_val, v);
-				return;
-			} else if (tracename == "fsr") {
+			if (tracename == "fsr") {
 				size_t len = rz_bv_len(trace_val);
 				uint64_t fsr = rz_bv_to_ut64(trace_val);
 				// Remove the exception related fields until we have exception hooks.
@@ -255,7 +249,9 @@ class Sparc32TraceAdapter : public TraceAdapter {
 			return rz_reg_name == "pc" || rz_reg_name == "npc" ||
 				// See the passive aggressive comment below for the same case
 				// of the Sparc64 adapter. I stick with increment only for now.
-				rz_reg_name == "cwp";
+				rz_reg_name == "cwp" ||
+				// Doesn't exist in Sparc32, but is present in gdb.
+				rz_reg_name == "fprs";
 		}
 };
 
