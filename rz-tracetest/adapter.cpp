@@ -238,6 +238,78 @@ class Sparc32TraceAdapter : public TraceAdapter {
 			rz_bv_set_from_ut64(rizin_val, fsr & ~0x3ffull);
 		}
 
+
+		bool RegNeedsCustomHandling(const std::string &trace_reg_name) const override {
+			return trace_reg_name == "psr";
+		}
+
+		void CompareSubreg(RzReg *rz_reg_instance, const char *rz_subreg_name, ut64 rexpected, RzStrBuf *miss_name, RzStrBuf *miss_val) override {
+			RzRegItem *rz_reg_item = rz_reg_get(rz_reg_instance, rz_subreg_name, RZ_REG_TYPE_ANY);
+			RzBitVector *actual_val = rz_reg_get_bv(rz_reg_instance, rz_reg_item);
+			if (RZ_STR_EQ(rz_subreg_name, "ccr")) {
+				// Only compare the icc bits.
+				ut64 v = rz_bv_to_ut64(actual_val);
+				rz_bv_fini(actual_val);
+				rz_bv_init(actual_val, 8);
+				rz_bv_set_from_ut64(actual_val, v & 0xf);
+			}
+			RzBitVector *expected_val = rz_bv_new_from_ut64(rz_reg_item->size, rexpected);
+			if (!rz_bv_eq(actual_val, expected_val) && !IgnorePostMismatchReg(rz_subreg_name)) {
+				if (rz_strbuf_length(miss_name) > 0) {
+					rz_strbuf_append(miss_name, " | ");
+				}
+				rz_strbuf_append(miss_name, rz_subreg_name);
+				char *tmp = rz_bv_as_hex_string(actual_val, true);
+				if (rz_strbuf_length(miss_val) > 0) {
+					rz_strbuf_append(miss_val, " | ");
+				}
+				rz_strbuf_append(miss_val, tmp);
+				free(tmp);
+				failed_custom_compare = true;
+			}
+			rz_bv_free(actual_val);
+			rz_bv_free(expected_val);
+		}
+
+		void CustomRegSetup(RzReg *rz_reg, const std::string &trace_reg_name, const RzBitVector *trace_bv) const override {
+			if (trace_reg_name != "psr") {
+				return;
+			}
+			// QEMU encodes icc, xcc, asi, ppsr and cwp in psr.
+			uint64_t psr = rz_bv_to_ut64(trace_bv);
+			uint64_t cwp = psr & 0xf;
+			uint64_t ccr = (psr >> 20) & 0xf;
+
+			RzRegItem *reg_cwp = rz_reg_get(rz_reg, "cwp", RZ_REG_TYPE_ANY);
+			RzRegItem *reg_ccr = rz_reg_get(rz_reg, "ccr", RZ_REG_TYPE_ANY);
+			assert(reg_cwp && reg_ccr);
+
+			rz_reg_set_bv(rz_reg, reg_cwp, rz_bv_new_from_ut64(reg_cwp->size, cwp));
+			rz_reg_set_bv(rz_reg, reg_ccr, rz_bv_new_from_ut64(reg_ccr->size, ccr));
+		}
+
+		bool CustomRegCompare(RzReg *rz_reg,
+			const std::string &trace_reg_name,
+			const RzBitVector *trace_bv,
+			RZ_OUT char **mismatch_name,
+			RZ_OUT char **mismatch_val) override {
+			assert(trace_reg_name == "psr");
+			uint64_t psr = rz_bv_to_ut64(trace_bv);
+			uint64_t cwp_expected = psr & 0xf;
+			uint64_t ccr_expected = (psr >> 20) & 0xf;
+
+			RzStrBuf *miss_name = rz_strbuf_new("");
+			RzStrBuf *miss_val = rz_strbuf_new("");
+
+			failed_custom_compare = false;
+			CompareSubreg(rz_reg, "cwp", cwp_expected, miss_name, miss_val);
+			CompareSubreg(rz_reg, "ccr", ccr_expected, miss_name, miss_val);
+
+			*mismatch_name = rz_strbuf_drain(miss_name);
+			*mismatch_val = rz_strbuf_drain(miss_val);
+			return failed_custom_compare == false;
+		}
+
 		// We ignore all writes and reads to PC or NPC.
 		// Due to the inability of the QEMU trace to properly
 		// log delayed branches, we need to test them separatly.
