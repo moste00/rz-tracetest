@@ -123,7 +123,7 @@ void RizinEmulator::SetMem(SerializedTrace::TraceContainerReader &trace) {
 		const uint8_t *data = (const ut8 *)sf.rawbytes().data();
 		ut32 size = sf.rawbytes().size();
 		float done = 100.00f * (float) i++ / (float) n;
-		printf("\rTotal frames: %lu Done: %5.2f%% (written: %lu kb)", n, done, total_written / 1000);
+		printf("\rTotal frames: %llu Done: %5.2f%% (written: %llu kb)", n, done, total_written / 1000);
 
 		if (written.count(pc) != 0) {
 			continue;
