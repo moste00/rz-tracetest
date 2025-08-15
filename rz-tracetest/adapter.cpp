@@ -3,10 +3,13 @@
 
 #include "adapter.h"
 
+#include <algorithm>
 #include <memory>
+#include <rz_types.h>
 #include <rz_util/rz_bitvector.h>
 #include <rz_util/rz_hex.h>
 #include <rz_util/rz_strbuf.h>
+#include <vector>
 
 static inline bool IsOneBitFlag(const std::string &tn) {
 	// PPC
@@ -182,6 +185,14 @@ class Arm64TraceAdapter : public TraceAdapter {
 };
 
 class Sparc32TraceAdapter : public TraceAdapter {
+	private:
+		std::vector<const char *> event_ignore_regs = {
+			"cwp",
+			"ccr",
+			"pstate",
+			"asi",
+			"fprs"
+		};
 	public:
 		std::string RizinArch() const override { return "sparc"; }
 		std::string RizinCPU() const override { return "v8"; }
@@ -204,12 +215,12 @@ class Sparc32TraceAdapter : public TraceAdapter {
 			case RZ_IL_EVENT_VAR_READ: {
 				// These registers don't exist in the QEMU.
 				const char *var_name = event->data.var_read.variable;
-				return RZ_STR_EQ(var_name, "cwp") || RZ_STR_EQ(var_name, "ccr") || RZ_STR_EQ(var_name, "pstate") || RZ_STR_EQ(var_name, "asi") || RZ_STR_EQ(var_name, "fprs");
+				return std::any_of(event_ignore_regs.begin(), event_ignore_regs.end(), [&](const char *elem) {return RZ_STR_EQ(var_name, elem);});
 			}
 			case RZ_IL_EVENT_VAR_WRITE: {
 				// These registers don't exist in the QEMU.
 				const char *var_name = event->data.var_write.variable;
-				return RZ_STR_EQ(var_name, "cwp") || RZ_STR_EQ(var_name, "ccr") || RZ_STR_EQ(var_name, "pstate") || RZ_STR_EQ(var_name, "asi") || RZ_STR_EQ(var_name, "fprs");
+				return std::any_of(event_ignore_regs.begin(), event_ignore_regs.end(), [&](const char *elem) {return RZ_STR_EQ(var_name, elem);});
 			}
 			case RZ_IL_EVENT_MEM_READ:
 			case RZ_IL_EVENT_MEM_WRITE:
@@ -326,6 +337,13 @@ class Sparc32TraceAdapter : public TraceAdapter {
 };
 
 class Sparc64TraceAdapter : public TraceAdapter {
+	private:
+		std::vector<const char *> event_ignore_regs = {
+			"cwp",
+			"ccr",
+			"pstate",
+			"asi"
+		};
 	public:
 		std::string RizinArch() const override { return "sparc"; }
 		std::string RizinCPU() const override { return "v9"; }
@@ -348,12 +366,12 @@ class Sparc64TraceAdapter : public TraceAdapter {
 			case RZ_IL_EVENT_VAR_READ: {
 				// These registers don't exist in the QEMU.
 				const char *var_name = event->data.var_read.variable;
-				return RZ_STR_EQ(var_name, "cwp") || RZ_STR_EQ(var_name, "ccr") || RZ_STR_EQ(var_name, "pstate") || RZ_STR_EQ(var_name, "asi");
+				return std::any_of(event_ignore_regs.begin(), event_ignore_regs.end(), [&](const char *elem) {return RZ_STR_EQ(var_name, elem);});
 			}
 			case RZ_IL_EVENT_VAR_WRITE: {
 				// These registers don't exist in the QEMU.
 				const char *var_name = event->data.var_write.variable;
-				return RZ_STR_EQ(var_name, "cwp") || RZ_STR_EQ(var_name, "ccr") || RZ_STR_EQ(var_name, "pstate") || RZ_STR_EQ(var_name, "asi");
+				return std::any_of(event_ignore_regs.begin(), event_ignore_regs.end(), [&](const char *elem) {return RZ_STR_EQ(var_name, elem);});
 			}
 			case RZ_IL_EVENT_MEM_READ:
 			case RZ_IL_EVENT_MEM_WRITE:
