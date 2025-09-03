@@ -28,6 +28,7 @@ RizinEmulator::RizinEmulator(std::unique_ptr<TraceAdapter> adapter_arg)
 		rz_config_set_i(core->config, "asm.bits", bits);
 	}
 	rz_config_set_b(core->config, "cfg.bigendian", adapter->IsBigEndian());
+	reg->big_endian = adapter->IsBigEndian();
 	char *reg_profile = rz_analysis_get_reg_profile(core->analysis);
 	if (!reg_profile) {
 		throw RizinException("Failed to get reg profile.");
@@ -55,11 +56,26 @@ static void PrintEvent(ut64 index, const RzILEvent *ev) {
 	rz_strbuf_fini(&sb);
 }
 
-static bool MemAccessJustifiedByOperands(RzBitVector *address, ut32 bits, const operand_value_list &operands) {
+/**
+ * \brief Check if 1 or more memory operand in \p operands
+ * overlap with the value access of \p address and \p val.
+ * If 1+ memory operands in the frame also access the same address
+ * up until end of \p val (overlap with it), the memory access of the VM is justified.
+ * The memory value is not compared!
+ *
+ * \param address The RzIL VM memory addressed accessed.
+ * \param val The memory value the RzIL VM wrote/read.
+ * \param operands The operands of the frame. Can be Pre- or Post-operands.
+ *
+ * \return True if one ore more \p operands overlap the same memory as \p address and \p val.
+ * \return False otherwise.
+ */
+static bool MemAccessJustifiedByOperands(RzBitVector *address, ut32 val, const operand_value_list &operands) {
 	ut64 addr = rz_bv_to_ut64(address);
-	ut64 size = (bits + 7) / 8; // round IL accesses up to be on the safe side
+	ut64 size = (val + 7) / 8; // round IL accesses up to be on the safe side
 	bool improved = false; // whether a new piece of the access was justified in the last iteration
 	do {
+		improved = false;
 		for (const auto &o : operands.elem()) {
 			if (!o.operand_info_specific().has_mem_operand()) {
 				continue;
@@ -107,7 +123,7 @@ void RizinEmulator::SetMem(SerializedTrace::TraceContainerReader &trace) {
 		const uint8_t *data = (const ut8 *)sf.rawbytes().data();
 		ut32 size = sf.rawbytes().size();
 		float done = 100.00f * (float) i++ / (float) n;
-		printf("\rTotal frames: %lu Done: %5.2f%% (written: %lu kb)", n, done, total_written / 1000);
+		printf("\rTotal frames: %llu Done: %5.2f%% (written: %llu kb)", n, done, total_written / 1000);
 
 		if (written.count(pc) != 0) {
 			continue;
@@ -142,8 +158,14 @@ std::map<std::string, int> RizinEmulator::get_post_op_map(const std_frame &sf) {
 	return duplicate_map;
 }
 
+static void print_reg_mismatch_msg(const char *rz_reg, const char *trace_reg, const char *rz_reg_val, const char *trace_reg_val) {
+	printf(Color_RED "MISMATCH" Color_RESET " post register:\n");
+	printf("  expected %8s = %s\n", trace_reg, trace_reg_val);
+	printf("  got      %8s = %s\n", rz_reg, rz_reg_val);
+}
+
 FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut64> next_pc, int verbose, bool invalid_op_quiet,
-	std::optional<std::function<bool(const std::string &)>> skip_by_disasm, bool cache_reset) {
+	std::optional<std::function<bool(const std::string &)>> skip_by_disasm, size_t *tested_insn_id, bool cache_reset) {
 	if (!f->has_std_frame()) {
 		printf("Non-std frame, can't deal with this (yet)\n");
 		return FrameCheckResult::Unimplemented;
@@ -247,6 +269,12 @@ FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut6
 			if (rn.empty()) {
 				continue;
 			}
+			if (adapter->RegNeedsCustomHandling(ro.name())) {
+				RzBitVector *bv = rz_bv_new_from_bytes_le((const ut8 *)o.value().data(), 0, RegOperandSizeBits(o));
+				adapter->CustomRegSetup(reg.get(), ro.name(), bv);
+				rz_bv_free(bv);
+				continue;
+			}
 			RzRegItem *ri = rz_reg_get(reg.get(), rn.c_str(), RZ_REG_TYPE_ANY);
 			if (!ri) {
 				if (adapter->IgnoreUnknownReg(ro.name())) {
@@ -295,8 +323,10 @@ FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut6
 			print_disasm();
 			printf("analysis plugin did not lift to IL\n");
 		}
-		return FrameCheckResult::InvalidOp;
+		return FrameCheckResult::Unimplemented;
 	}
+	*tested_insn_id = aop->id;
+
 	RzILValidateReport validate_report = nullptr;
 	if (!rz_il_validate_effect(aop->il_op, validate_ctx.get(), NULL, NULL, &validate_report)) {
 		print_disasm();
@@ -322,14 +352,17 @@ FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut6
 			printf("runtime error\n");
 			return FrameCheckResult::VMRuntimeError;
 		case RZ_ANALYSIS_IL_STEP_INVALID_OP:
-			printf("unlifted or invalid op\n");
+			printf("invalid op\n");
 			return FrameCheckResult::InvalidOp;
+		case RZ_ANALYSIS_IL_STEP_UNIMPLEMENTED_IL:
+			printf("unlifted op\n");
+			return FrameCheckResult::Unimplemented;
 		case RZ_ANALYSIS_IL_STEP_RESULT_NOT_SET_UP:
 			printf("not set up\n");
-			return FrameCheckResult::Unimplemented;
+			return FrameCheckResult::VMRuntimeError;
 		default:
 			printf("unknown\n");
-			return FrameCheckResult::Unimplemented;
+			return FrameCheckResult::InvalidIL;
 		}
 	}
 
@@ -362,9 +395,10 @@ FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut6
 		printf("\n");
 
 		printf(Color_GREEN "IL EVENTS:" Color_RESET "\n");
-		void *evtp;
 		uint64_t i = 0;
-		rz_vector_foreach (&vm->vm->events->v, evtp) {
+		void **it;
+		rz_pvector_foreach (vm->vm->events, it) {
+			RzILEvent *evtp = *((RzILEvent **)it);
 			printf("  ");
 			PrintEvent(i++, (RzILEvent *) evtp);
 		}
@@ -400,6 +434,21 @@ FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut6
 			if (rn.empty()) {
 				continue;
 			}
+			if (adapter->RegNeedsCustomHandling(ro.name())) {
+				char *mismatching_reg = NULL;
+				char *mismatching_val = NULL;
+				RzBitVector *bv = rz_bv_new_from_bytes_le((const ut8 *)o.value().data(), 0, RegOperandSizeBits(o));
+				if (!adapter->CustomRegCompare(reg.get(), ro.name(), bv, &mismatching_reg, &mismatching_val)) {
+					mismatched();
+					char *ts = rz_bv_as_hex_string(bv, true);
+					print_reg_mismatch_msg(mismatching_reg, ro.name().c_str(), mismatching_val, ts);
+					rz_mem_free(ts);
+					rz_mem_free(mismatching_val);
+					rz_mem_free(mismatching_reg);
+				}
+				rz_bv_free(bv);
+				continue;
+			}
 			RzRegItem *ri = rz_reg_get(reg.get(), rn.c_str(), RZ_REG_TYPE_ANY);
 			if (!ri) {
 				if (!adapter->IgnoreUnknownReg(ro.name())) {
@@ -415,13 +464,11 @@ FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut6
 				pc_tracename = ro.name();
 				pc_expect = rz_bv_to_ut64(tbv);
 			}
-			if (!rz_bv_eq(tbv, rbv) && (post_op_map[rn] <= 1)) {
+			if (!rz_bv_eq(tbv, rbv) && (post_op_map[rn] <= 1) && !adapter->IgnorePostMismatchReg(ri->name)) {
 				mismatched();
 				char *ts = rz_bv_as_hex_string(tbv, true);
 				char *rs = rz_bv_as_hex_string(rbv, true);
-				printf(Color_RED "MISMATCH" Color_RESET " post register:\n");
-				printf("  expected %8s = %s\n", ro.name().c_str(), ts);
-				printf("  got      %8s = %s\n", ri->name, rs);
+				print_reg_mismatch_msg(ri->name, ro.name().c_str(), rs, ts);
 				rz_mem_free(ts);
 				rz_mem_free(rs);
 			} else {
@@ -468,10 +515,11 @@ FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut6
 	void *evtp;
 	uint64_t evi = 0;
 	bool unjustified_printed = false;
-	rz_vector_foreach (&vm->vm->events->v, evtp) {
-		RzILEvent *ev = (RzILEvent *) evtp;
+	void **it;
+	rz_pvector_foreach (vm->vm->events, it) {
+		RzILEvent *ev = *((RzILEvent **)it);
 		bool justified = false;
-		if (adapter->IgnoreEvent(ev)) {
+		if (adapter->AssumeEventIsJustified(ev)) {
 			evi++;
 			justified = true;
 			continue;

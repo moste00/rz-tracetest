@@ -4,6 +4,7 @@
 #ifndef _TRACEADAPTER_H
 #define _TRACEADAPTER_H
 
+#include <rz_util/rz_bitvector.h>
 #include <trace.container.hpp>
 
 #include <rz_util.h>
@@ -15,10 +16,81 @@
 // Mask to exclude ISA3 flags (ca32, ov32).
 #define PPC_XER_ISA2_BITS_MASK 0xfffffffffff3ffff
 
+struct reg_name_mapping {
+	const char *qemu;
+	const char *rz;
+};
+
+static struct reg_name_mapping hexagon_reg_mapping[] {
+	{ .qemu = "r00", .rz = "R0" },
+	{ .qemu = "r01", .rz = "R1" },
+	{ .qemu = "r02", .rz = "R2" },
+	{ .qemu = "r03", .rz = "R3" },
+	{ .qemu = "r04", .rz = "R4" },
+	{ .qemu = "r05", .rz = "R5" },
+	{ .qemu = "r06", .rz = "R6" },
+	{ .qemu = "r07", .rz = "R7" },
+	{ .qemu = "r08", .rz = "R8" },
+	{ .qemu = "r09", .rz = "R9" },
+	{ .qemu = "r10", .rz = "R10" },
+	{ .qemu = "r11", .rz = "R11" },
+	{ .qemu = "r12", .rz = "R12" },
+	{ .qemu = "r13", .rz = "R13" },
+	{ .qemu = "r14", .rz = "R14" },
+	{ .qemu = "r15", .rz = "R15" },
+	{ .qemu = "r16", .rz = "R16" },
+	{ .qemu = "r17", .rz = "R17" },
+	{ .qemu = "r18", .rz = "R18" },
+	{ .qemu = "r19", .rz = "R19" },
+	{ .qemu = "r20", .rz = "R20" },
+	{ .qemu = "r21", .rz = "R21" },
+	{ .qemu = "r22", .rz = "R22" },
+	{ .qemu = "r23", .rz = "R23" },
+	{ .qemu = "r24", .rz = "R24" },
+	{ .qemu = "r25", .rz = "R25" },
+	{ .qemu = "r26", .rz = "R26" },
+	{ .qemu = "r27", .rz = "R27" },
+	{ .qemu = "r28", .rz = "R28" },
+	{ .qemu = "r29", .rz = "R29" },
+	{ .qemu = "r30", .rz = "R30" },
+	{ .qemu = "r31", .rz = "R31" },
+
+	{ .qemu = "sa0", .rz = "C0" },
+	{ .qemu = "lc0", .rz = "C1" },
+	{ .qemu = "sa1", .rz = "C2" },
+	{ .qemu = "lc1", .rz = "C3" },
+	{ .qemu = "p3_0", .rz = "C4" },
+	// C5 = reserved
+	{ .qemu = "m0", .rz = "C6" },
+	{ .qemu = "m1", .rz = "C7" },
+	{ .qemu = "usr", .rz = "C8" },
+	// PC = C9
+	{ .qemu = "ugp", .rz = "C10" },
+	{ .qemu = "gp", .rz = "C11" },
+	{ .qemu = "cs0", .rz = "C12" },
+	{ .qemu = "cs1", .rz = "C13" },
+	{ .qemu = "upcyclelo", .rz = "C14" },
+	{ .qemu = "upcyclehi", .rz = "C15" },
+	{ .qemu = "framelimit", .rz = "C16" },
+	{ .qemu = "framekey", .rz = "C17" },
+	{ .qemu = "pktcountlo", .rz = "C18" },
+	{ .qemu = "pktcounthi", .rz = "C19" },
+	// Dummy regs (supposingly)
+	// { .qemu = "pkt_cnt", .rz = "pkt_cnt" },
+	// { .qemu = "insn_cnt", .rz = "C0" },
+	// { .qemu = "hvx_cnt", .rz = "C0" },
+	{ .qemu = "utimerlo", .rz = "C30" },
+	{ .qemu = "utimerhi", .rz = "C31" },
+};
+
 /*
  * Interface for any arch/source/... specific adjustments
  */
 class TraceAdapter {
+	protected:
+		bool failed_custom_compare = false;
+		virtual void CompareSubreg(RzReg *rz_reg, const char *rname, ut64 rexpected, RzStrBuf *miss_name, RzStrBuf *miss_val) {}
+
 	public:
 		virtual ~TraceAdapter() {}
 
@@ -92,22 +164,69 @@ class TraceAdapter {
 		virtual bool IgnoreCompareMemMismatch() const { return false; }
 
 		/**
-		 * \brief Returns if a given register name from the trace should be ignored if it isn't implemented in Rizin.
+		 * \brief Returns if a given register name from the trace should be ignored
+		 * if it isn't implemented in Rizin.
 		 *
-		 * \param rz_reg_name The trace register name.
+		 * \param trace_reg_name The trace register name.
 		 * \return true The register, missing in Rizin, should be ignored.
 		 * \return false Notify the user about the missing register in Rizin.
 		 */
-		virtual bool IgnoreUnknownReg(const std::string &rz_reg_name) const;
+		virtual bool IgnoreUnknownReg(const std::string &trace_reg_name) const;
 
 		/**
-		 * \brief Checks if the given even can be ignored during checks.
+		 * \brief Returns true of the Adapter has to setup and comapre the register.
+		 * This is useful if a single register from the trace maps to several
+		 * registers in Rizin or the other way around.
 		 *
-		 * \param event The trace event to check.
+		 * \param trace_reg_name The trace register name.
+		 *
+		 * \return true The register is setup by the adapter.
+		 * \return false Default handling for this register.
+		 */
+		virtual bool RegNeedsCustomHandling(const std::string &trace_reg_name) const { return false; }
+
+		/**
+		 * \brief Adapter custom setup of a given trace register.
+		 *
+		 * \param rz_reg The RzReg instance of Rizin to update.
+		 * \param trace_reg_name The trace register name.
+		 * \param trace_bv The value of the trace register.
+		 */
+		virtual void CustomRegSetup(RzReg *rz_reg, const std::string &trace_reg_name, const RzBitVector *trace_bv) const { return; }
+
+		/**
+		 * \brief Adapter custom setup of a given trace register.
+		 *
+		 * \param rz_reg The RzReg instance of Rizin to update.
+		 * \param trace_reg_name The trace register name.
+		 * \param trace_bv The value of the trace register.
+		 * \param mismatch_name The register name in Rizin which doesn't match. NULL if match was successful.
+		 * \param mismatch_value The register value in Rizin which doesn't match. NULL if match was successful.
+		 *
+		 * \return true If the custom comparison matches.
+		 * \return false In case of mismatch.
+		 */
+		virtual bool CustomRegCompare(RzReg *rz_reg, const std::string &trace_reg_name, const RzBitVector *trace_bv, RZ_OUT char **mismatch_name, RZ_OUT char **mismatch_val) { return false; }
+
+		/**
+		 * \brief Returns if a post state mismatch
+		 * of the given register can be ignored.
+		 *
+		 * \param rz_reg_name The Rizin register name.
+		 * \return true The register mismatch can be ignored.
+		 * \return false Mismatch should be logged.
+		 */
+		virtual bool IgnorePostMismatchReg(const std::string &rz_reg_name) const { return false; }
+
+		/**
+		 * \brief Checks if the given even can be ignored during justification checks.
+		 * NOTE: This won't ignore found any value mismatches.
+		 *
+		 * \param event The VM event to check.
 		 * \return true If the given event should be treated as justified.
 		 * \return false If the given event should be treated as any other event.
 		 */
-		virtual bool IgnoreEvent(const RzILEvent *event) const { return false; };
+		virtual bool AssumeEventIsJustified(const RzILEvent *event) const { return false; };
 
 		/**
 		 * If this returns true, assignments to a variable with the same value as the variable had before
@@ -139,6 +258,6 @@ class TraceAdapter {
 		uint64_t machine = 0;
 };
 
-std::unique_ptr<TraceAdapter> SelectTraceAdapter(frame_architecture arch);
+std::unique_ptr<TraceAdapter> SelectTraceAdapter(frame_architecture arch, size_t mach);
 
 #endif

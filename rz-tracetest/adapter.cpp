@@ -3,7 +3,13 @@
 
 #include "adapter.h"
 
+#include <algorithm>
 #include <memory>
+#include <rz_types.h>
+#include <rz_util/rz_bitvector.h>
+#include <rz_util/rz_hex.h>
+#include <rz_util/rz_strbuf.h>
+#include <vector>
 
 static inline bool IsOneBitFlag(const std::string &tn) {
 	// PPC
@@ -21,7 +27,7 @@ int TraceAdapter::RizinBits(std::optional<std::string> mode, std::optional<uint6
 	return 0;
 }
 
-bool TraceAdapter::IgnoreUnknownReg(const std::string &rz_reg_name) const {
+bool TraceAdapter::IgnoreUnknownReg(const std::string &trace_reg_name) const {
 	return false;
 }
 
@@ -178,6 +184,316 @@ class Arm64TraceAdapter : public TraceAdapter {
 		}
 };
 
+class Sparc32TraceAdapter : public TraceAdapter {
+	private:
+		std::vector<const char *> event_ignore_regs = {
+			"cwp",
+			"ccr",
+			"pstate",
+			"asi",
+			"fprs"
+		};
+	public:
+		std::string RizinArch() const override { return "sparc"; }
+		std::string RizinCPU() const override { return "v8"; }
+
+		int RizinBits(std::optional<std::string> mode, std::optional<uint64_t> machine) const override { return 32; }
+
+		std::string TraceRegToRizin(const std::string &tracereg) const override {
+			return tracereg;
+		}
+
+		bool AllowNoOperandSameValueAssignment() const override {
+			return true;
+		}
+
+		bool AssumeEventIsJustified(const RzILEvent *event) const override {
+			// Ignore all writes which didn't change anything.
+			switch (event->type) {
+			default:
+				return false;
+			case RZ_IL_EVENT_VAR_READ: {
+				// These registers don't exist in the QEMU.
+				const char *var_name = event->data.var_read.variable;
+				return std::any_of(event_ignore_regs.begin(), event_ignore_regs.end(), [&](const char *elem) {return RZ_STR_EQ(var_name, elem);});
+			}
+			case RZ_IL_EVENT_VAR_WRITE: {
+				// These registers don't exist in the QEMU.
+				const char *var_name = event->data.var_write.variable;
+				return std::any_of(event_ignore_regs.begin(), event_ignore_regs.end(), [&](const char *elem) {return RZ_STR_EQ(var_name, elem);});
+			}
+			case RZ_IL_EVENT_MEM_READ:
+			case RZ_IL_EVENT_MEM_WRITE:
+				// The memory region 1 is Rizin's region to backup register content for read and write.
+				return event->data.mem_write.index == 1; // = SPARC_ASI_INDEX_RW
+			}
+			return false;
+		};
+
+		void AdjustRegContentsFromTrace(const std::string &tracename, RzBitVector *trace_val, RzAnalysisOp *op = nullptr) const override {
+			if (tracename == "fsr") {
+				size_t len = rz_bv_len(trace_val);
+				uint64_t fsr = rz_bv_to_ut64(trace_val);
+				// Remove the exception related fields until we have exception hooks.
+				rz_bv_set_from_ut64(trace_val, fsr & ~0x3ffull);
+				return;
+			}
+		}
+
+		void AdjustRegContentsFromRizin(const std::string &tracename, RzBitVector *rizin_val) const override {
+			if (tracename != "fsr") {
+				return;
+			}
+			size_t len = rz_bv_len(rizin_val);
+			uint64_t fsr = rz_bv_to_ut64(rizin_val);
+			// Remove the exception related fields until we have exception hooks.
+			rz_bv_set_from_ut64(rizin_val, fsr & ~0x3ffull);
+		}
+
+
+		bool RegNeedsCustomHandling(const std::string &trace_reg_name) const override {
+			return trace_reg_name == "psr";
+		}
+
+		void CompareSubreg(RzReg *rz_reg_instance, const char *rz_subreg_name, ut64 rexpected, RzStrBuf *miss_name, RzStrBuf *miss_val) override {
+			RzRegItem *rz_reg_item = rz_reg_get(rz_reg_instance, rz_subreg_name, RZ_REG_TYPE_ANY);
+			RzBitVector *actual_val = rz_reg_get_bv(rz_reg_instance, rz_reg_item);
+			if (RZ_STR_EQ(rz_subreg_name, "ccr")) {
+				// Only compare the icc bits.
+				ut64 v = rz_bv_to_ut64(actual_val);
+				rz_bv_fini(actual_val);
+				rz_bv_init(actual_val, 8);
+				rz_bv_set_from_ut64(actual_val, v & 0xf);
+			}
+			RzBitVector *expected_val = rz_bv_new_from_ut64(rz_reg_item->size, rexpected);
+			if (!rz_bv_eq(actual_val, expected_val) && !IgnorePostMismatchReg(rz_subreg_name)) {
+				if (rz_strbuf_length(miss_name) > 0) {
+					rz_strbuf_append(miss_name, " | ");
+				}
+				rz_strbuf_append(miss_name, rz_subreg_name);
+				char *tmp = rz_bv_as_hex_string(actual_val, true);
+				if (rz_strbuf_length(miss_val) > 0) {
+					rz_strbuf_append(miss_val, " | ");
+				}
+				rz_strbuf_append(miss_val, tmp);
+				free(tmp);
+				failed_custom_compare = true;
+			}
+			rz_bv_free(actual_val);
+			rz_bv_free(expected_val);
+		}
+
+		void CustomRegSetup(RzReg *rz_reg, const std::string &trace_reg_name, const RzBitVector *trace_bv) const override {
+			if (trace_reg_name != "psr") {
+				return;
+			}
+			// QEMU encodes icc, xcc, asi, ppsr and cwp in psr.
+			uint64_t psr = rz_bv_to_ut64(trace_bv);
+			uint64_t cwp = psr & 0x1f;
+			uint64_t ccr = (psr >> 20) & 0xf;
+
+			RzRegItem *reg_cwp = rz_reg_get(rz_reg, "cwp", RZ_REG_TYPE_ANY);
+			RzRegItem *reg_ccr = rz_reg_get(rz_reg, "ccr", RZ_REG_TYPE_ANY);
+			assert(reg_cwp && reg_ccr);
+
+			rz_reg_set_bv(rz_reg, reg_cwp, rz_bv_new_from_ut64(reg_cwp->size, cwp));
+			rz_reg_set_bv(rz_reg, reg_ccr, rz_bv_new_from_ut64(reg_ccr->size, ccr));
+		}
+
+		bool CustomRegCompare(RzReg *rz_reg,
+			const std::string &trace_reg_name,
+			const RzBitVector *trace_bv,
+			RZ_OUT char **mismatch_name,
+			RZ_OUT char **mismatch_val) override {
+			assert(trace_reg_name == "psr");
+			uint64_t psr = rz_bv_to_ut64(trace_bv);
+			uint64_t cwp_expected = psr & 0x1f;
+			uint64_t ccr_expected = (psr >> 20) & 0xf;
+
+			RzStrBuf *miss_name = rz_strbuf_new("");
+			RzStrBuf *miss_val = rz_strbuf_new("");
+
+			failed_custom_compare = false;
+			CompareSubreg(rz_reg, "cwp", cwp_expected, miss_name, miss_val);
+			CompareSubreg(rz_reg, "ccr", ccr_expected, miss_name, miss_val);
+
+			*mismatch_name = rz_strbuf_drain(miss_name);
+			*mismatch_val = rz_strbuf_drain(miss_val);
+			return failed_custom_compare == false;
+		}
+
+		// We ignore all writes and reads to PC or NPC.
+		// Due to the inability of the QEMU trace to properly
+		// log delayed branches, we need to test them separatly.
+		bool IgnorePCMismatch(ut64 pc_actual, ut64 pc_expect) const override {
+			return true;
+		}
+
+		virtual bool IgnorePostMismatchReg(const std::string &rz_reg_name) const override {
+			return rz_reg_name == "pc" || rz_reg_name == "npc" ||
+				// Doesn't exist in Sparc32, but is present in gdb.
+				rz_reg_name == "fprs";
+		}
+};
+
+class Sparc64TraceAdapter : public TraceAdapter {
+	private:
+		std::vector<const char *> event_ignore_regs = {
+			"cwp",
+			"ccr",
+			"pstate",
+			"asi"
+		};
+	public:
+		std::string RizinArch() const override { return "sparc"; }
+		std::string RizinCPU() const override { return "v9"; }
+
+		int RizinBits(std::optional<std::string> mode, std::optional<uint64_t> machine) const override { return 64; }
+
+		std::string TraceRegToRizin(const std::string &tracereg) const override {
+			return tracereg;
+		}
+
+		bool AllowNoOperandSameValueAssignment() const override {
+			return true;
+		}
+
+		bool AssumeEventIsJustified(const RzILEvent *event) const override {
+			// Ignore all writes which didn't change anything.
+			switch (event->type) {
+			default:
+				return false;
+			case RZ_IL_EVENT_VAR_READ: {
+				// These registers don't exist in the QEMU.
+				const char *var_name = event->data.var_read.variable;
+				return std::any_of(event_ignore_regs.begin(), event_ignore_regs.end(), [&](const char *elem) {return RZ_STR_EQ(var_name, elem);});
+			}
+			case RZ_IL_EVENT_VAR_WRITE: {
+				// These registers don't exist in the QEMU.
+				const char *var_name = event->data.var_write.variable;
+				return std::any_of(event_ignore_regs.begin(), event_ignore_regs.end(), [&](const char *elem) {return RZ_STR_EQ(var_name, elem);});
+			}
+			case RZ_IL_EVENT_MEM_READ:
+			case RZ_IL_EVENT_MEM_WRITE:
+				// The memory region 1 is Rizin's region to backup register content for read and write.
+				return event->data.mem_write.index == 1; // = SPARC_ASI_INDEX_RW
+			}
+			return false;
+		};
+
+		void AdjustRegContentsFromTrace(const std::string &tracename, RzBitVector *trace_val, RzAnalysisOp *op = nullptr) const override {
+			if (tracename == "fprs") {
+				ut8 v = rz_bv_to_ut8(trace_val);
+				rz_bv_fini(trace_val);
+				rz_bv_init(trace_val, 3);
+				rz_bv_set_from_ut64(trace_val, v);
+				return;
+			} else if (tracename == "fsr") {
+				size_t len = rz_bv_len(trace_val);
+				uint64_t fsr = rz_bv_to_ut64(trace_val);
+				// Remove the exception related fields until we have exception hooks.
+				rz_bv_set_from_ut64(trace_val, fsr & ~0x3ffull);
+				return;
+			}
+		}
+
+		void AdjustRegContentsFromRizin(const std::string &tracename, RzBitVector *rizin_val) const override {
+			if (tracename != "fsr") {
+				return;
+			}
+			size_t len = rz_bv_len(rizin_val);
+			uint64_t fsr = rz_bv_to_ut64(rizin_val);
+			// Remove the exception related fields until we have exception hooks.
+			rz_bv_set_from_ut64(rizin_val, fsr & ~0x3ffull);
+		}
+
+		bool IgnoreUnknownReg(const std::string &trace_reg_name) const override {
+			return false;
+		}
+
+		bool RegNeedsCustomHandling(const std::string &trace_reg_name) const override {
+			return trace_reg_name == "state";
+		}
+
+		void CompareSubreg(RzReg *rz_reg_instance, const char *rz_subreg_name, ut64 rexpected, RzStrBuf *miss_name, RzStrBuf *miss_val) override {
+			RzRegItem *rz_reg_item = rz_reg_get(rz_reg_instance, rz_subreg_name, RZ_REG_TYPE_ANY);
+			RzBitVector *actual_val = rz_reg_get_bv(rz_reg_instance, rz_reg_item);
+			RzBitVector *expected_val = rz_bv_new_from_ut64(rz_reg_item->size, rexpected);
+			if (!rz_bv_eq(actual_val, expected_val) && !IgnorePostMismatchReg(rz_subreg_name)) {
+				if (rz_strbuf_length(miss_name) > 0) {
+					rz_strbuf_append(miss_name, " | ");
+				}
+				rz_strbuf_append(miss_name, rz_subreg_name);
+				char *tmp = rz_bv_as_hex_string(actual_val, true);
+				if (rz_strbuf_length(miss_val) > 0) {
+					rz_strbuf_append(miss_val, " | ");
+				}
+				rz_strbuf_append(miss_val, tmp);
+				free(tmp);
+				failed_custom_compare = true;
+			}
+			rz_bv_free(actual_val);
+			rz_bv_free(expected_val);
+		}
+
+		void CustomRegSetup(RzReg *rz_reg, const std::string &trace_reg_name, const RzBitVector *trace_bv) const override {
+			if (trace_reg_name != "state") {
+				return;
+			}
+			// QEMU encodes icc, xcc, asi, pstate and cwp in state.
+			uint64_t state = rz_bv_to_ut64(trace_bv);
+			uint64_t cwp = state & 0xff;
+			uint64_t pstate = (state >> 8) & 0xfff;
+			uint64_t asi = (state >> 24) & 0xff;
+			uint64_t ccr = (state >> 32) & 0xff;
+
+			RzRegItem *reg_cwp = rz_reg_get(rz_reg, "cwp", RZ_REG_TYPE_ANY);
+			RzRegItem *reg_asi = rz_reg_get(rz_reg, "asi", RZ_REG_TYPE_ANY);
+			RzRegItem *reg_pstate = rz_reg_get(rz_reg, "pstate", RZ_REG_TYPE_ANY);
+			RzRegItem *reg_ccr = rz_reg_get(rz_reg, "ccr", RZ_REG_TYPE_ANY);
+			assert(reg_cwp && reg_asi && reg_pstate && reg_ccr);
+
+			rz_reg_set_bv(rz_reg, reg_cwp, rz_bv_new_from_ut64(reg_cwp->size, cwp));
+			rz_reg_set_bv(rz_reg, reg_asi, rz_bv_new_from_ut64(reg_asi->size, asi));
+			rz_reg_set_bv(rz_reg, reg_pstate, rz_bv_new_from_ut64(reg_pstate->size, pstate));
+			rz_reg_set_bv(rz_reg, reg_ccr, rz_bv_new_from_ut64(reg_ccr->size, ccr));
+		}
+
+		bool CustomRegCompare(RzReg *rz_reg,
+			const std::string &trace_reg_name,
+			const RzBitVector *trace_bv,
+			RZ_OUT char **mismatch_name,
+			RZ_OUT char **mismatch_val) override {
+			assert(trace_reg_name == "state");
+			uint64_t state = rz_bv_to_ut64(trace_bv);
+			uint64_t cwp_expected = state & 0xff;
+			uint64_t pstate_expected = (state >> 8) & 0xfff;
+			uint64_t asi_expected = (state >> 24) & 0xff;
+			uint64_t ccr_expected = (state >> 32) & 0xff;
+
+			RzStrBuf *miss_name = rz_strbuf_new("");
+			RzStrBuf *miss_val = rz_strbuf_new("");
+
+			failed_custom_compare = false;
+			CompareSubreg(rz_reg, "cwp", cwp_expected, miss_name, miss_val);
+			CompareSubreg(rz_reg, "asi", asi_expected, miss_name, miss_val);
+			CompareSubreg(rz_reg, "pstate", pstate_expected, miss_name, miss_val);
+			CompareSubreg(rz_reg, "ccr", ccr_expected, miss_name, miss_val);
+
+			*mismatch_name = rz_strbuf_drain(miss_name);
+			*mismatch_val = rz_strbuf_drain(miss_val);
+			return failed_custom_compare == false;
+		}
+
+		bool IgnorePCMismatch(ut64 pc_actual, ut64 pc_expect) const override {
+			return true;
+		}
+
+		virtual bool IgnorePostMismatchReg(const std::string &rz_reg_name) const override {
+			return rz_reg_name == "pc" || rz_reg_name == "npc";
+		}
+};
+
 class PPCTraceAdapter : public TraceAdapter {
 	public:
 		std::string RizinArch() const override { return "ppc"; }
@@ -193,8 +509,8 @@ class PPCTraceAdapter : public TraceAdapter {
 			return false;
 		}
 
-		bool IgnoreUnknownReg(const std::string &rz_reg_name) const override {
-			return rz_reg_name == "ca32" || rz_reg_name == "ov32";
+		bool IgnoreUnknownReg(const std::string &trace_reg_name) const override {
+			return trace_reg_name == "ca32" || trace_reg_name == "ov32";
 		}
 
 		std::string TraceRegToRizin(const std::string &tracereg) const override {
@@ -261,7 +577,7 @@ class I8051TraceAdapter : public TraceAdapter {
 			return false;
 		}
 
-		bool IgnoreUnknownReg(const std::string &rz_reg_name) const override {
+		bool IgnoreUnknownReg(const std::string &trace_reg_name) const override {
 			return true;
 		}
 };
@@ -280,7 +596,7 @@ class MipsTraceAdapter : public TraceAdapter {
 			return false;
 		}
 
-		bool IgnoreUnknownReg(const std::string &rz_reg_name) const override {
+		bool IgnoreUnknownReg(const std::string &trace_reg_name) const override {
 			return true;
 		}
 };
@@ -345,16 +661,18 @@ class HexagonTraceAdapter : public TraceAdapter {
 			return false;
 		}
 
-		bool IgnoreUnknownReg(const std::string &rz_reg_name) const override {
+		bool IgnoreUnknownReg(const std::string &trace_reg_name) const override {
 			return false;
 		}
 
 		std::string TraceRegToRizin(const std::string &tracereg) const override {
-			std::string r = tracereg.substr(0, tracereg.find("_tmp"));
-			std::transform(r.begin(), r.end(), r.begin(), ::toupper);
-			if (tracereg.find("_tmp") != std::string::npos) {
-				return r + "_tmp";
+			std::string r = tracereg;
+			for (size_t i = 0; i < RZ_ARRAY_SIZE(hexagon_reg_mapping); ++i) {
+				if (hexagon_reg_mapping[i].qemu == tracereg) {
+					r = hexagon_reg_mapping[i].rz;
+				}
 			}
+			std::transform(r.begin(), r.end(), r.begin(), ::toupper);
 			return r;
 		}
 
@@ -364,7 +682,7 @@ class HexagonTraceAdapter : public TraceAdapter {
 			return true;
 		}
 
-		bool IgnoreEvent(const RzILEvent *event) const {
+		bool AssumeEventIsJustified(const RzILEvent *event) const override {
 			// We ignore all writes and reads to .new register for now, because they
 			// get optimized away by QEMU for some instrucions.
 			switch (event->type) {
@@ -396,30 +714,29 @@ class HexagonTraceAdapter : public TraceAdapter {
 			}
 			return false;
 		};
-
 };
 
 class X86TraceAdapter : public TraceAdapter {
-	std::string RizinArch() const override {
-		return "x86";
-	}
+		std::string RizinArch() const override {
+			return "x86";
+		}
 
-	int RizinBits(std::optional<std::string> mode, std::optional<uint64_t> machine) const override {
-		return (machine && machine.value() == frame_mach_x86_64) ? 64 : 32;
-	}
+		int RizinBits(std::optional<std::string> mode, std::optional<uint64_t> machine) const override {
+			return (machine && machine.value() == frame_mach_x86_64) ? 64 : 32;
+		}
 
-	bool IgnorePCMismatch(ut64 pc_actual, ut64 pc_expect) const override {
-		return false;
-	}
+		bool IgnorePCMismatch(ut64 pc_actual, ut64 pc_expect) const override {
+			return false;
+		}
 
-	virtual std::string TraceRegToRizin(const std::string &tracereg) const override {
-		std::string r = tracereg;
-		std::transform(r.begin(), r.end(), r.begin(), ::tolower);
-		return r;
-	}
+		virtual std::string TraceRegToRizin(const std::string &tracereg) const override {
+			std::string r = tracereg;
+			std::transform(r.begin(), r.end(), r.begin(), ::tolower);
+			return r;
+		}
 };
 
-std::unique_ptr<TraceAdapter> SelectTraceAdapter(frame_architecture arch) {
+std::unique_ptr<TraceAdapter> SelectTraceAdapter(frame_architecture arch, size_t mach) {
 	switch (arch) {
 	case frame_arch_6502:
 		return std::unique_ptr<TraceAdapter>(new VICETraceAdapter());
@@ -439,6 +756,16 @@ std::unique_ptr<TraceAdapter> SelectTraceAdapter(frame_architecture arch) {
 		return std::unique_ptr<TraceAdapter>(new HexagonTraceAdapter());
 	case frame_arch_i386:
 		return std::unique_ptr<TraceAdapter>(new X86TraceAdapter());
+	case frame_arch_sparc: {
+		std::unique_ptr<TraceAdapter> adapter;
+		if (frame_mach_sparc_64bit_p(mach) != 0) {
+			adapter = std::unique_ptr<TraceAdapter>(new Sparc64TraceAdapter());
+		} else {
+			adapter = std::unique_ptr<TraceAdapter>(new Sparc32TraceAdapter());
+		}
+		adapter->SetIsBigEndian(mach == frame_mach_sparc_sparclite_le ? false : true);
+		return adapter;
+	}
 	default:
 		return nullptr;
 	}
