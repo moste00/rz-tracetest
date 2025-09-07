@@ -736,6 +736,26 @@ class X86TraceAdapter : public TraceAdapter {
 		}
 };
 
+class TriCoreTraceAdapter : public TraceAdapter {
+		std::string RizinArch() const override {
+			return "tricore";
+		}
+
+		int RizinBits(std::optional<std::string> mode, std::optional<uint64_t> machine) const override {
+			return 32;
+		}
+
+		bool IgnorePCMismatch(ut64 pc_actual, ut64 pc_expect) const override {
+			return false;
+		}
+
+		virtual std::string TraceRegToRizin(const std::string &tracereg) const override {
+			std::string r = tracereg;
+			std::transform(r.begin(), r.end(), r.begin(), ::tolower);
+			return r;
+		}
+};
+
 std::unique_ptr<TraceAdapter> SelectTraceAdapter(frame_architecture arch, size_t mach) {
 	switch (arch) {
 	case frame_arch_6502:
@@ -756,6 +776,8 @@ std::unique_ptr<TraceAdapter> SelectTraceAdapter(frame_architecture arch, size_t
 		return std::unique_ptr<TraceAdapter>(new HexagonTraceAdapter());
 	case frame_arch_i386:
 		return std::unique_ptr<TraceAdapter>(new X86TraceAdapter());
+	case frame_arch_tricore:
+		return std::unique_ptr<TraceAdapter>(new TriCoreTraceAdapter());
 	case frame_arch_sparc: {
 		std::unique_ptr<TraceAdapter> adapter;
 		if (frame_mach_sparc_64bit_p(mach) != 0) {
