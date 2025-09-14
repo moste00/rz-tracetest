@@ -751,7 +751,7 @@ class TriCoreTraceAdapter : public TraceAdapter {
 			return false;
 		}
 
-		virtual std::string TraceRegToRizin(const std::string &tracereg) const override {
+		std::string TraceRegToRizin(const std::string &tracereg) const override {
 			std::string r = tracereg;
 			if (r.size() > 1 && (r[0] == 'a' || r[0] == 'd')) {
 				bool alldigits = std::all_of(r.begin() + 1, r.end(), [](unsigned char c) { return std::isdigit(c); });
@@ -762,6 +762,31 @@ class TriCoreTraceAdapter : public TraceAdapter {
 			std::transform(r.begin(), r.end(), r.begin(), ::toupper);
 			return r;
 		}
+
+		bool IgnorePostMismatchReg(const std::string &rz_reg_name) const override {
+			static const std::vector<std::string> ignore_regs = {
+				"cpu_id", "syscon"
+			};
+			static const auto cmp_icase = [&](const std::string &x) {
+				return std::equal(x.begin(), x.end(),
+					rz_reg_name.begin(), rz_reg_name.end(),
+					[](char a, char b) {
+						return tolower(a) == tolower(b);
+					});
+			};
+			return std::find_if(ignore_regs.begin(), ignore_regs.end(), cmp_icase) != ignore_regs.end();
+		}
+
+		bool IgnoreUnknownReg(const std::string &trace_reg_name) const override { return true; }
+
+		bool AssumeEventIsJustified(const RzILEvent *event) const override {
+			if (event->type != RZ_IL_EVENT_VAR_WRITE) {
+				return false;
+			}
+			auto oldv = event->data.var_write.old_value;
+			auto newv = event->data.var_write.new_value;
+			return rz_il_value_eq(oldv, newv);
+		};
 };
 
 std::unique_ptr<TraceAdapter> SelectTraceAdapter(frame_architecture arch, size_t mach) {
