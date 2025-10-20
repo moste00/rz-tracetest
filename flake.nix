@@ -75,8 +75,8 @@
       {
         devShells = {
           default = pkgs.mkShell {
-            inputsFrom = [ self.packages.${system}.rz-tracetest ];
-            packages = [ rz-tracetest ];
+            inputsFrom = [ rz-tracetest ];
+            packages = [ ];
           };
         };
 
