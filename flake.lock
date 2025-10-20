@@ -5,22 +5,19 @@
         "flake-utils": "flake-utils",
         "nixpkgs": [
           "nixpkgs"
-        ],
-        "ocaml-overlay": [
-          "ocaml-overlay"
         ]
       },
       "locked": {
-        "lastModified": 1757445287,
-        "narHash": "sha256-6iweZNsQ5CAGV//fuM3RDhHI3nkB03v4sOCbtAlNdts=",
+        "lastModified": 1760697512,
+        "narHash": "sha256-F5NBA7Xe6kyvU3gDuJen0au2MdkNXk9VSMoRCRoOvR0=",
         "owner": "b1llow",
-        "repo": "my-nix-flakes",
-        "rev": "7a83dfcc647dc2e10a1eb7c74a0429eee9c9d4e8",
+        "repo": "nix",
+        "rev": "e2b2547ca7ed95d14249f7b6389a2ea6e961545d",
         "type": "github"
       },
       "original": {
         "owner": "b1llow",
-        "repo": "my-nix-flakes",
+        "repo": "nix",
         "type": "github"
       }
     },
@@ -76,32 +73,11 @@
         "type": "github"
       }
     },
-    "ocaml-overlay": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1756716675,
-        "narHash": "sha256-hd/en9OPQ2H5vwaWsNhOC8ThW8eSC8hXFvQim7kqbV8=",
-        "owner": "nix-ocaml",
-        "repo": "nix-overlays",
-        "rev": "0367fb29f87c34eeaaa89aecf07055760f6ebe20",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nix-ocaml",
-        "repo": "nix-overlays",
-        "type": "github"
-      }
-    },
     "root": {
       "inputs": {
         "b": "b",
         "flake-utils": "flake-utils_2",
-        "nixpkgs": "nixpkgs",
-        "ocaml-overlay": "ocaml-overlay"
+        "nixpkgs": "nixpkgs"
       }
     },
     "systems": {

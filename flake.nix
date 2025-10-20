@@ -1,15 +1,12 @@
 {
-  description = "build env";
+  description = "rz-tracetest - Testing of RzIL against real traces";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/release-25.05";
     flake-utils.url = "github:numtide/flake-utils";
-    ocaml-overlay.url = "github:nix-ocaml/nix-overlays";
-    ocaml-overlay.inputs.nixpkgs.follows = "nixpkgs";
     b = {
-      url = "github:b1llow/my-nix-flakes";
+      url = "github:b1llow/nix";
       inputs.nixpkgs.follows = "nixpkgs";
-      inputs.ocaml-overlay.follows = "ocaml-overlay";
     };
   };
 
@@ -18,7 +15,6 @@
       self,
       nixpkgs,
       flake-utils,
-      ocaml-overlay,
       b,
       ...
     }:
@@ -27,14 +23,12 @@
       let
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [
-            ocaml-overlay.overlays.default
-          ];
         };
         inherit (pkgs)
           stdenv
+          ocaml-ng
+          nixfmt-tree
           ;
-        ocaml414 = (pkgs.ocaml-ng.ocamlPackages_4_14 or pkgs.ocamlPackages_4_14);
 
         bap-frames = pkgs.fetchFromGitHub {
           owner = "b1llow";
@@ -43,7 +37,9 @@
           sha256 = "sha256-1f65TEIXncDD6N54Ton/VsoNYBoxEr1h0P2HIOSzI+o=";
         };
 
-        tracetest = pkgs.stdenv.mkDerivation {
+        rizin = b.packages.${system}.rizin;
+
+        rz-tracetest = pkgs.stdenv.mkDerivation {
           pname = "rz-tracetest";
           version = "0.1.0";
 
@@ -53,12 +49,12 @@
             pkg-config
             cmake
             protobuf_21
-            ocaml414.piqi
+            ocaml-ng.ocamlPackages_4_14.piqi
           ];
           buildInputs = with pkgs; [
             protobuf_21
             openssl.dev
-            b.packages.${system}.rizin
+            rizin
           ];
 
           postPatch = ''
@@ -67,23 +63,29 @@
           preConfigure = ''
             cd rz-tracetest
           '';
+
+          meta = with pkgs.lib; {
+            description = "Testing of RzIL against real traces";
+            homepage = "https://github.com/rizinorg/rz-tracetest";
+            license = licenses.lgpl3Only;
+            mainProgram = "rz-tracetest";
+          };
         };
       in
       {
         devShells = {
           default = pkgs.mkShell {
-            inputsFrom = [ self.packages.${system}.default ];
-            shellHook = ''
-              export NIX_CFLAGS_COMPILE="$NIX_CFLAGS_COMPILE -g3 -fno-omit-frame-pointer"
-              export CMAKE_BUILD_TYPE="Debug"
-            '';
+            inputsFrom = [ self.packages.${system}.rz-tracetest ];
+            packages = [ rz-tracetest ];
           };
         };
 
         packages = {
-          inherit tracetest;
-          default = tracetest;
+          inherit rz-tracetest;
+          default = rz-tracetest;
         };
+
+        formatter = nixfmt-tree;
 
       }
     );
