@@ -31,9 +31,9 @@
           ;
 
         bap-frames = pkgs.fetchFromGitHub {
-          owner = "b1llow";
+          owner = "BinaryAnalysisPlatform";
           repo = "bap-frames";
-          rev = "refs/heads/tricore-support";
+          rev = "refs/heads/master";
           sha256 = "sha256-1f65TEIXncDD6N54Ton/VsoNYBoxEr1h0P2HIOSzI+o=";
         };
 
