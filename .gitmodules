@@ -1,4 +1,4 @@
 [submodule "bap-frames"]
 	path = bap-frames
-	url = https://github.com/b1llow/bap-frames.git
+	url = https://github.com/BinaryAnalysisPlatform/bap-frames.git
 	branch = tricore-support
