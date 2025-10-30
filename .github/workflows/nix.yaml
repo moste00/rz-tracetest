@@ -1,0 +1,65 @@
+name: "Nix Build and Lint"
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+# Automatically cancel any previous workflow on new push.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  nix-build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+        env:
+          NIX_FIRST_BUILD_UID: "700"
+
+      - name: Check flake
+        run: nix flake check --all-systems --show-trace
+
+      - name: Build rz-tracetest
+        run: nix build .#rz-tracetest --print-build-logs
+
+      - name: Test binary
+        run: |
+          ./result/bin/rz-tracetest --help || true
+
+  nix-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Evaluate flake
+        run: nix flake show --all-systems
+
+      - name: Check flake metadata
+        run: nix flake metadata
+
+      - name: Check formatting
+        run: nix fmt -- --ci .

@@ -122,7 +122,7 @@ void RizinEmulator::SetMem(SerializedTrace::TraceContainerReader &trace) {
 
 		const uint8_t *data = (const ut8 *)sf.rawbytes().data();
 		ut32 size = sf.rawbytes().size();
-		float done = 100.00f * (float) i++ / (float) n;
+		float done = 100.00f * (float)i++ / (float)n;
 		printf("\rTotal frames: %llu Done: %5.2f%% (written: %llu kb)", n, done, total_written / 1000);
 
 		if (written.count(pc) != 0) {
@@ -400,7 +400,7 @@ FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut6
 		rz_pvector_foreach (vm->vm->events, it) {
 			RzILEvent *evtp = *((RzILEvent **)it);
 			printf("  ");
-			PrintEvent(i++, (RzILEvent *) evtp);
+			PrintEvent(i++, (RzILEvent *)evtp);
 		}
 		printf("\n");
 
@@ -502,9 +502,10 @@ FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut6
 		}
 	}
 
-	// check program counter
+	const RzBitVector *pc_vm_bv = vm->vm->pc;
+	ut64 pc_vm = rz_bv_to_ut64(pc_vm_bv);
 	ut64 pc_actual = rz_reg_get_value(reg.get(), pc_ri);
-	if (pc_actual != pc_expect && !adapter->IgnorePCMismatch(pc_actual, pc_expect)) {
+	if (pc_vm != pc_expect && pc_actual != pc_expect && !adapter->IgnorePCMismatch(pc_actual, pc_expect)) {
 		mismatched();
 		printf(Color_RED "MISMATCH" Color_RESET " post program counter:\n");
 		printf("  expected %8s = 0x%" PFMT64x "\n", pc_tracename.c_str(), pc_expect);

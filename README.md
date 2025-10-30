@@ -60,6 +60,63 @@ contained instructions and print mismatches between the trace and RzIL if found:
 rz-tracetest mytrace.frames
 ```
 
+Building with Nix
+-----------------
+
+### Prerequisites
+
+- [Nix](https://nixos.org/download) installed with flakes support enabled
+
+### Quick Start
+
+To enter a development environment with all dependencies:
+
+```bash
+nix develop
+```
+
+This command sets up a shell with:
+- CMake and Ninja build tools
+- Protobuf compiler and development libraries
+- OCaml with Piqi (for protocol buffer generation)
+- Rizin (the main binary analysis framework)
+
+### Building
+
+Once in the development shell:
+
+```bash
+cmake -B build -S rz-tracetest -GNinja
+cmake --build build
+```
+
+### Building without entering a shell
+
+To build directly without entering the development environment:
+
+```bash
+nix build
+```
+
+The resulting executable will be available at `./result/bin/rz-tracetest`.
+
+### Running with Nix
+
+To run `rz-tracetest` directly with Nix:
+
+```bash
+nix run . -- mytrace.frames
+```
+
+### Flake outputs
+
+The flake provides the following:
+
+- **packages.rz-tracetest**: The compiled `rz-tracetest` executable
+- **packages.default**: Alias for `rz-tracetest`
+- **devShells.default**: Development shell with all build dependencies
+- **formatter**: `nixfmt-tree` for Nix code formatting
+
 Adjustments to specific Archs/Sources/...
 -----------------------------------------
 

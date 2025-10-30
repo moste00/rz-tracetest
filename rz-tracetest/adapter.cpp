@@ -4,6 +4,7 @@
 #include "adapter.h"
 
 #include <algorithm>
+#include <cctype>
 #include <memory>
 #include <rz_types.h>
 #include <rz_util/rz_bitvector.h>
@@ -193,6 +194,7 @@ class Sparc32TraceAdapter : public TraceAdapter {
 			"asi",
 			"fprs"
 		};
+
 	public:
 		std::string RizinArch() const override { return "sparc"; }
 		std::string RizinCPU() const override { return "v8"; }
@@ -215,12 +217,12 @@ class Sparc32TraceAdapter : public TraceAdapter {
 			case RZ_IL_EVENT_VAR_READ: {
 				// These registers don't exist in the QEMU.
 				const char *var_name = event->data.var_read.variable;
-				return std::any_of(event_ignore_regs.begin(), event_ignore_regs.end(), [&](const char *elem) {return RZ_STR_EQ(var_name, elem);});
+				return std::any_of(event_ignore_regs.begin(), event_ignore_regs.end(), [&](const char *elem) { return RZ_STR_EQ(var_name, elem); });
 			}
 			case RZ_IL_EVENT_VAR_WRITE: {
 				// These registers don't exist in the QEMU.
 				const char *var_name = event->data.var_write.variable;
-				return std::any_of(event_ignore_regs.begin(), event_ignore_regs.end(), [&](const char *elem) {return RZ_STR_EQ(var_name, elem);});
+				return std::any_of(event_ignore_regs.begin(), event_ignore_regs.end(), [&](const char *elem) { return RZ_STR_EQ(var_name, elem); });
 			}
 			case RZ_IL_EVENT_MEM_READ:
 			case RZ_IL_EVENT_MEM_WRITE:
@@ -249,7 +251,6 @@ class Sparc32TraceAdapter : public TraceAdapter {
 			// Remove the exception related fields until we have exception hooks.
 			rz_bv_set_from_ut64(rizin_val, fsr & ~0x3ffull);
 		}
-
 
 		bool RegNeedsCustomHandling(const std::string &trace_reg_name) const override {
 			return trace_reg_name == "psr";
@@ -344,6 +345,7 @@ class Sparc64TraceAdapter : public TraceAdapter {
 			"pstate",
 			"asi"
 		};
+
 	public:
 		std::string RizinArch() const override { return "sparc"; }
 		std::string RizinCPU() const override { return "v9"; }
@@ -366,12 +368,12 @@ class Sparc64TraceAdapter : public TraceAdapter {
 			case RZ_IL_EVENT_VAR_READ: {
 				// These registers don't exist in the QEMU.
 				const char *var_name = event->data.var_read.variable;
-				return std::any_of(event_ignore_regs.begin(), event_ignore_regs.end(), [&](const char *elem) {return RZ_STR_EQ(var_name, elem);});
+				return std::any_of(event_ignore_regs.begin(), event_ignore_regs.end(), [&](const char *elem) { return RZ_STR_EQ(var_name, elem); });
 			}
 			case RZ_IL_EVENT_VAR_WRITE: {
 				// These registers don't exist in the QEMU.
 				const char *var_name = event->data.var_write.variable;
-				return std::any_of(event_ignore_regs.begin(), event_ignore_regs.end(), [&](const char *elem) {return RZ_STR_EQ(var_name, elem);});
+				return std::any_of(event_ignore_regs.begin(), event_ignore_regs.end(), [&](const char *elem) { return RZ_STR_EQ(var_name, elem); });
 			}
 			case RZ_IL_EVENT_MEM_READ:
 			case RZ_IL_EVENT_MEM_WRITE:
@@ -736,6 +738,57 @@ class X86TraceAdapter : public TraceAdapter {
 		}
 };
 
+class TriCoreTraceAdapter : public TraceAdapter {
+		std::string RizinArch() const override {
+			return "tricore";
+		}
+
+		int RizinBits(std::optional<std::string> mode, std::optional<uint64_t> machine) const override {
+			return 32;
+		}
+
+		bool IgnorePCMismatch(ut64 pc_actual, ut64 pc_expect) const override {
+			return false;
+		}
+
+		std::string TraceRegToRizin(const std::string &tracereg) const override {
+			std::string r = tracereg;
+			if (r.size() > 1 && (r[0] == 'a' || r[0] == 'd')) {
+				bool alldigits = std::all_of(r.begin() + 1, r.end(), [](unsigned char c) { return std::isdigit(c); });
+				if (alldigits) {
+					return r;
+				}
+			}
+			std::transform(r.begin(), r.end(), r.begin(), ::toupper);
+			return r;
+		}
+
+		bool IgnorePostMismatchReg(const std::string &rz_reg_name) const override {
+			static const std::vector<std::string> ignore_regs = {
+				"cpu_id", "syscon"
+			};
+			static const auto cmp_icase = [&](const std::string &x) {
+				return std::equal(x.begin(), x.end(),
+					rz_reg_name.begin(), rz_reg_name.end(),
+					[](char a, char b) {
+						return tolower(a) == tolower(b);
+					});
+			};
+			return std::find_if(ignore_regs.begin(), ignore_regs.end(), cmp_icase) != ignore_regs.end();
+		}
+
+		bool IgnoreUnknownReg(const std::string &trace_reg_name) const override { return true; }
+
+		bool AssumeEventIsJustified(const RzILEvent *event) const override {
+			if (event->type != RZ_IL_EVENT_VAR_WRITE) {
+				return false;
+			}
+			auto oldv = event->data.var_write.old_value;
+			auto newv = event->data.var_write.new_value;
+			return rz_il_value_eq(oldv, newv);
+		};
+};
+
 std::unique_ptr<TraceAdapter> SelectTraceAdapter(frame_architecture arch, size_t mach) {
 	switch (arch) {
 	case frame_arch_6502:
@@ -756,6 +809,8 @@ std::unique_ptr<TraceAdapter> SelectTraceAdapter(frame_architecture arch, size_t
 		return std::unique_ptr<TraceAdapter>(new HexagonTraceAdapter());
 	case frame_arch_i386:
 		return std::unique_ptr<TraceAdapter>(new X86TraceAdapter());
+	case frame_arch_tricore:
+		return std::unique_ptr<TraceAdapter>(new TriCoreTraceAdapter());
 	case frame_arch_sparc: {
 		std::unique_ptr<TraceAdapter> adapter;
 		if (frame_mach_sparc_64bit_p(mach) != 0) {
