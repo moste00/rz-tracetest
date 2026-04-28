@@ -33,7 +33,7 @@
         bap-frames = pkgs.fetchFromGitHub {
           owner = "BinaryAnalysisPlatform";
           repo = "bap-frames";
-          rev = "refs/heads/master";
+          rev = "821c2b6cd044c5dff72077bc6812e8bd16491465";
           sha256 = "sha256-1f65TEIXncDD6N54Ton/VsoNYBoxEr1h0P2HIOSzI+o=";
         };
 
@@ -58,6 +58,7 @@
           ];
 
           postPatch = ''
+            rm -rf ./bap-frames
             cp -r ${bap-frames} ./bap-frames
           '';
           preConfigure = ''
