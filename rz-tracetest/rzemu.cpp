@@ -123,7 +123,7 @@ void RizinEmulator::SetMem(SerializedTrace::TraceContainerReader &trace) {
 		const uint8_t *data = (const ut8 *)sf.rawbytes().data();
 		ut32 size = sf.rawbytes().size();
 		float done = 100.00f * (float)i++ / (float)n;
-		printf("\rTotal frames: %llu Done: %5.2f%% (written: %llu kb)", n, done, total_written / 1000);
+		printf("\rTotal frames: %" PFMT64u " Done: %5.2f%% (written: %" PFMT64u " kb)", n, done, total_written / 1000);
 
 		if (written.count(pc) != 0) {
 			continue;
@@ -178,7 +178,7 @@ FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut6
 	const uint32_t code_size = sf.rawbytes().length();
 
 	int need_bits = adapter->RizinBits(sf.has_mode() ? std::make_optional(sf.mode()) : std::nullopt, adapter->GetMachine());
-	if (need_bits && need_bits != core->rasm->bits) {
+	if (need_bits && need_bits != rz_asm_get_bits(core->rasm)) {
 		rz_config_set_i(core->config, "asm.bits", need_bits);
 	}
 
@@ -194,7 +194,7 @@ FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut6
 		}
 		disasm = Disasm();
 		RzAsmOp asmop = {};
-		core->rasm->pc = sf.address();
+		rz_asm_set_pc(core->rasm, sf.address());
 		disasm->failed = !code_size || rz_asm_disassemble(core->rasm, &asmop, code_data, code_size) <= 0;
 		if (!disasm->failed) {
 			disasm->disasm_str = rz_strbuf_get(&asmop.buf_asm);
@@ -485,7 +485,7 @@ FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut6
 			const auto &mo = o.operand_info_specific().mem_operand();
 			ut64 size = MemOperandSizeBytes(o);
 			std::vector<ut8> actual(size);
-			rz_io_read_at(io, mo.address(), actual.data(), size);
+			rz_io_read_at_mapped(io, mo.address(), actual.data(), size);
 			if (memcmp(actual.data(), o.value().data(), size)) {
 				mismatched();
 				char *ts = rz_hex_bin2strdup((const ut8 *)o.value().data(), size);
