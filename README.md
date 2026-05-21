@@ -174,3 +174,36 @@ Works with TCG tracing plugin
 | Hexagon      | Yes                   |
 | PPC          | No - register and endian mismatches |
 | ARM          | No - Cannot trace cpu modes |
+
+
+## Troubleshooting
+
+### Build Errors
+**Protobuf Variable Shadowing Error (`target` does not name a type)**
+
+When building on rolling-release Linux distros (like Arch Linux) providing modern Protocol Buffer installations (`protoc` version 22+ / v25+ / v34+), compilation of the generated C++ files may fail with errors resembling:
+
+```zsh
+error: ‘target’ does not name a type
+   const target& this_ = *this;
+error: ‘this_’ was not declared in this scope
+   this_.CheckHasBitConsistency();
+```
+
+**Cause:**
+>Starting with the release of Protocol Buffers v22.x in early 2023, Google introduced significant, breaking changes to the C++ code generator and runtime APIs.The primary driver for these API modifications was Google's decision to drop support for C++11, adopt C++14 as the new baseline, and explicitly introduce support for C++20 keywords
+
+Stable releases of distros like Ubuntu or Debian pin older versions of Protobuf (`v3.x`), which generate legacy C++ code that does not encounter this namespace collision. Rolling-release distributions like Arch Linux install the latest versions (`v34.x`), exposing the bug.
+
+**Solutions**
+1. **If you use Nix:** Follow [Building with Nix](#building-with-nix). The Nix Flake automatically provisions an isolated, compatible legacy toolchain.
+
+2. **If not using Nix**
+   - Ensure if your host environment has zero dependencies relying on modern Protobuf using `pactree -r protobuf`
+   - If safe to proceed, use the `downgrade` tool to downgrade protobuf version from `34.x` to any version before `21.x`. Run `sudo downgrade protobuf` and select `3.20.1`. 
+   - Perform a clean build 
+      ```zsh  
+      rm -rf build/
+      cmake -Bbuild -GNinja
+      ninja -C build
+      ```
