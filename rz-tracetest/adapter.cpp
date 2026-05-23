@@ -21,7 +21,7 @@ static inline bool IsOneBitFlag(const std::string &tn) {
 }
 
 std::string TraceAdapter::RizinCPU() const {
-	return std::string();
+	return isa;
 }
 
 int TraceAdapter::RizinBits(std::optional<std::string> mode, std::optional<uint64_t> machine) const {
