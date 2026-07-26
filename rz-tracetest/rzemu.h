@@ -41,6 +41,8 @@ class RizinException : public std::exception {
 enum class FrameCheckResult {
 	Success,
 	Skipped,
+	PostStateLess,
+	PostStateEmpty,
 	InvalidOp,
 	InvalidIL,
 	VMRuntimeError,
@@ -48,7 +50,7 @@ enum class FrameCheckResult {
 	Unimplemented,
 	Unkown
 };
-#define FRAME_CHECK_RESULT_COUNT 8
+#define FRAME_CHECK_RESULT_COUNT 10
 
 class RizinEmulator {
 	private:
