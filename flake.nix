@@ -4,10 +4,6 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
-    b = {
-      url = "github:b1llow/nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
   outputs =
@@ -15,7 +11,6 @@
       self,
       nixpkgs,
       flake-utils,
-      b,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -37,7 +32,7 @@
           sha256 = "sha256-1f65TEIXncDD6N54Ton/VsoNYBoxEr1h0P2HIOSzI+o=";
         };
 
-        rizin = b.packages.${system}.rizin;
+        rizin = pkgs.callPackage ./nix/rizin { };
 
         rz-tracetest = pkgs.stdenv.mkDerivation {
           pname = "rz-tracetest";
@@ -82,7 +77,7 @@
         };
 
         packages = {
-          inherit rz-tracetest;
+          inherit rizin rz-tracetest;
           default = rz-tracetest;
         };
 

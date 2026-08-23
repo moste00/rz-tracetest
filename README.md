@@ -100,6 +100,12 @@ nix build
 
 The resulting executable will be available at `./result/bin/rz-tracetest`.
 
+The pinned Rizin dependency can also be built independently:
+
+```bash
+nix build .#rizin
+```
+
 ### Running with Nix
 
 To run `rz-tracetest` directly with Nix:
@@ -112,10 +118,31 @@ nix run . -- mytrace.frames
 
 The flake provides the following:
 
+- **packages.rizin**: The pinned Rizin development revision
 - **packages.rz-tracetest**: The compiled `rz-tracetest` executable
 - **packages.default**: Alias for `rz-tracetest`
 - **devShells.default**: Development shell with all build dependencies
 - **formatter**: `nixfmt-tree` for Nix code formatting
+
+### Updating Rizin
+
+The pinned revision and fixed-output hashes are stored together in
+`nix/rizin/checksum.json`. From the repository root, update to the current
+Rizin `dev` branch with:
+
+```bash
+./nix/rizin/update.sh
+```
+
+To update to a specific full commit SHA instead:
+
+```bash
+./nix/rizin/update.sh <commit>
+```
+
+The updater recalculates the source and Meson dependency hashes, then builds
+both Rizin and `rz-tracetest`. It restores the previous checksum file if
+validation fails and does not create a commit.
 
 Adjustments to specific Archs/Sources/...
 -----------------------------------------

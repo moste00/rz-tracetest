@@ -619,7 +619,7 @@ bool RizinEmulator::TraceRegOverlapsILVar(const char *tracereg, const char *var)
 	if (!ri) {
 		return false;
 	}
-	if (!RegIsBound(vm->reg_binding, var)) {
+	if (!RegIsBound(vm->ctx->reg_binding, var)) {
 		return false;
 	}
 	if (rzreg == var) {
