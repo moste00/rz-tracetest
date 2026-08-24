@@ -35,6 +35,9 @@ jobs:
       - name: Check flake
         run: nix flake check --all-systems --show-trace
 
+      - name: Build Rizin
+        run: nix build .#rizin --no-link --print-build-logs
+
       - name: Build rz-tracetest
         run: nix build .#rz-tracetest --print-build-logs
 
