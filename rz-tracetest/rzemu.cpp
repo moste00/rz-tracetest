@@ -240,6 +240,25 @@ FrameCheckResult RizinEmulator::RunFrame(ut64 index, frame *f, std::optional<ut6
 		}
 	}
 
+	// The piqi schema makes operand_post_list optional, so there are two
+	// trace-level no-post-state cases: the field can be absent, or it can be
+	// present with an empty list. The current QEMU producer initializes the list
+	// eagerly, so an unclosed final frame is commonly PostStateEmpty in practice.
+	if (!sf.has_operand_post_list()) {
+		if (verbose > 0) {
+			print_disasm();
+			printf("operand_post_list absent; post-state comparison skipped\n");
+		}
+		return FrameCheckResult::PostStateLess;
+	}
+	if (sf.operand_post_list().elem().empty()) {
+		if (verbose > 0) {
+			print_disasm();
+			printf("operand_post_list present but empty; post-state comparison skipped\n");
+		}
+		return FrameCheckResult::PostStateEmpty;
+	}
+
 	RzRegItem *pc_ri = rz_reg_get_by_role(reg.get(), RZ_REG_NAME_PC);
 	if (!pc_ri) {
 		print_disasm();

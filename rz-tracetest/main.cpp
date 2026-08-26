@@ -149,7 +149,11 @@ int main(int argc, const char *argv[]) {
 		count--;
 		total++;
 		cur_frame = std::move(next_frame);
-		if (fail_early && res != FrameCheckResult::Success && res != FrameCheckResult::Skipped) {
+		if (fail_early &&
+			res != FrameCheckResult::Success &&
+			res != FrameCheckResult::Skipped &&
+			res != FrameCheckResult::PostStateLess &&
+			res != FrameCheckResult::PostStateEmpty) {
 			break;
 		}
 		if (fail_unlifted && res == FrameCheckResult::InvalidOp) {
@@ -163,7 +167,7 @@ int main(int argc, const char *argv[]) {
 			break;
 		}
 		float done = 100.00f * (float) total / (float) n;
-		printf("\rFrames: %llu Done: %5.2f%%", n, done);
+		printf("\rFrames: %" PFMT64u " Done: %5.2f%%", n, done);
 	}
 	printf("\n");
 
@@ -186,6 +190,12 @@ int main(int argc, const char *argv[]) {
 			break;
 		case FrameCheckResult::Skipped:
 			printf("              skipped: ");
+			break;
+		case FrameCheckResult::PostStateLess:
+			printf("      no post-state: ");
+			break;
+		case FrameCheckResult::PostStateEmpty:
+			printf("    empty post-state: ");
 			break;
 		case FrameCheckResult::InvalidOp:
 			printf("           invalid op: ");
